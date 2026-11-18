@@ -474,9 +474,13 @@ class _TabCombo extends ConsumerWidget {
                                   : null,
                               icon: const Icon(Icons.add),
                             ),
-                            const Spacer(),
-                            Text(
-                              '${emojiStatus(status)} ${labelStatus(status)}',
+                            Expanded(
+                              child: Text(
+                                '${emojiStatus(status)} ${labelStatus(status)}',
+                                textAlign: TextAlign.end,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),

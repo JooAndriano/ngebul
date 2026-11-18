@@ -402,28 +402,40 @@ class _SlotRak extends StatelessWidget {
           onTap: aktif ? onTap : null,
           child: Padding(
             padding: const EdgeInsets.all(4),
+            // Emoji & nama ikut mengecil jika slot pendek (font emoji
+            // perangkat bisa lebih tinggi dari perkiraan).
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  terkunci
-                      ? TampilanData.emojiKunci
-                      : sisa <= 0
-                      ? TampilanData.emojiStokHabis
-                      : item.emoji,
-                  style: const TextStyle(fontSize: 26),
+                Expanded(
+                  flex: 3,
+                  child: FittedBox(
+                    child: Text(
+                      terkunci
+                          ? TampilanData.emojiKunci
+                          : sisa <= 0
+                          ? TampilanData.emojiStokHabis
+                          : item.emoji,
+                      style: const TextStyle(fontSize: 26),
+                    ),
+                  ),
                 ),
-                Text(
-                  item.nama,
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall,
+                Flexible(
+                  flex: 2,
+                  child: Text(
+                    item.nama,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall,
+                  ),
                 ),
-                Text(
-                  terkunci ? '-' : 'sisa $sisa',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                FittedBox(
+                  child: Text(
+                    terkunci ? '-' : 'sisa $sisa',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

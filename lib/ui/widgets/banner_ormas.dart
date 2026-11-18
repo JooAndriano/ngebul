@@ -92,28 +92,33 @@ class BannerOrmas extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Wrap(
-              spacing: 6,
-              children: [
-                FilledButton(
-                  onPressed: e.uang >= o.jatah
-                      ? () => kabari(ctrl.bayarOrmas())
-                      : null,
-                  child: const Text('Bayar'),
-                ),
-                FilledButton.tonal(
-                  onPressed: !o.tawarDipakai && e.uang >= tawar
-                      ? () => kabari(ctrl.tawarOrmas())
-                      : null,
-                  child: Text('Tawar ${formatRupiah(tawar)}'),
-                ),
-                OutlinedButton(
-                  onPressed: o.rtDipakai
-                      ? null
-                      : () => kabari(ctrl.panggilPakRt()),
-                  child: Text('${TampilanData.emojiPakRt} Pak RT'),
-                ),
-              ],
+            // Tombol turun ke baris berikutnya jika layar sempit.
+            Flexible(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
+                children: [
+                  FilledButton(
+                    onPressed: e.uang >= o.jatah
+                        ? () => kabari(ctrl.bayarOrmas())
+                        : null,
+                    child: const Text('Bayar'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: !o.tawarDipakai && e.uang >= tawar
+                        ? () => kabari(ctrl.tawarOrmas())
+                        : null,
+                    child: Text('Tawar ${formatRupiah(tawar)}'),
+                  ),
+                  OutlinedButton(
+                    onPressed: o.rtDipakai
+                        ? null
+                        : () => kabari(ctrl.panggilPakRt()),
+                    child: Text('${TampilanData.emojiPakRt} Pak RT'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

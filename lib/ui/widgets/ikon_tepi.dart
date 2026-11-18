@@ -72,25 +72,35 @@ class _Ikon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
+    // Flexible + FittedBox: ikon mengecil jika layar pendek / teks besar.
+    return Flexible(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Tooltip(
+          message: label,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Text(emoji, style: const TextStyle(fontSize: 26)),
-                  Text(label, style: Theme.of(context).textTheme.labelSmall),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 26)),
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                  if (badge != null)
+                    Positioned(top: -2, right: -4, child: badge!),
                 ],
               ),
-              if (badge != null) Positioned(top: -2, right: -4, child: badge!),
-            ],
+            ),
           ),
         ),
       ),

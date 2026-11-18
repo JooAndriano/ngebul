@@ -78,9 +78,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Selector memakai engineAtauNull: saat "ulang pilih jenis usaha" engine
+    // sudah null sebelum layar ini dilepas.
+
     // Hari selesai -> tampilkan Laporan Harian.
     ref.listen<bool>(
-      simControllerProvider.select((v) => v.engine.hariSelesai),
+      simControllerProvider.select(
+        (v) => v.engineAtauNull?.hariSelesai ?? false,
+      ),
       (sebelum, selesai) {
         if (selesai && sebelum != true) {
           _scaffoldKey.currentState?.closeEndDrawer();
@@ -91,11 +96,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Alert baru -> snackbar.
     ref.listen<int>(
-      simControllerProvider.select(
-        (v) => v.engine.alerts.isEmpty ? 0 : v.engine.alerts.last.id,
-      ),
+      simControllerProvider.select((v) {
+        final alerts = v.engineAtauNull?.alerts;
+        return alerts == null || alerts.isEmpty ? 0 : alerts.last.id;
+      }),
       (sebelum, sekarang) {
-        final e = ref.read(simControllerProvider).engine;
+        final e = ref.read(simControllerProvider).engineAtauNull;
+        if (e == null) return;
         for (final a in e.alerts) {
           if (a.id > (sebelum ?? 0)) _tampilkanAlert(e, a);
         }

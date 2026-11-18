@@ -67,33 +67,31 @@ class _KartuUsaha extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPilih,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(k.emoji, style: const TextStyle(fontSize: 48)),
-              Text(
-                k.nama,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Flexible(
-                child: Text(
-                  k.deskripsi,
+        // Bisa digulir jika layar pendek / teks diperbesar.
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(k.emoji, style: const TextStyle(fontSize: 48)),
+                Text(
+                  k.nama,
                   textAlign: TextAlign.center,
-                  overflow: TextOverflow.fade,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text('Modal awal ${formatRupiah(k.uangAwal)}'),
-              Text(
-                '${k.item.length} barang • ${k.combo.length} paket',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(k.deskripsi, textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text('Modal awal ${formatRupiah(k.uangAwal)}'),
+                Text(
+                  '${k.item.length} barang • ${k.combo.length} paket',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
           ),
         ),
       ),

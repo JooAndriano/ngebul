@@ -122,26 +122,35 @@ class _BlokWarung extends StatelessWidget {
       ),
     );
 
+    // FittedBox: warung + figur ormas mengecil jika scene pendek.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          if (toko.ormas != null) _FigurOrmas(engine: engine, toko: toko),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (var i = 0; i < toko.ekspansi[Sisi.kiri]!; i++) potongan(),
-              Text(toko.katalog.emoji, style: const TextStyle(fontSize: 22)),
-              const Text(
-                TampilanData.emojiWarung,
-                style: TextStyle(fontSize: 64),
-              ),
-              for (var i = 0; i < toko.ekspansi[Sisi.kanan]!; i++) potongan(),
-            ],
-          ),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.bottomCenter,
+        child: _isiBlok(potongan),
       ),
+    );
+  }
+
+  Widget _isiBlok(Widget Function() potongan) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (toko.ormas != null) _FigurOrmas(engine: engine, toko: toko),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < toko.ekspansi[Sisi.kiri]!; i++) potongan(),
+            Text(toko.katalog.emoji, style: const TextStyle(fontSize: 22)),
+            const Text(
+              TampilanData.emojiWarung,
+              style: TextStyle(fontSize: 64),
+            ),
+            for (var i = 0; i < toko.ekspansi[Sisi.kanan]!; i++) potongan(),
+          ],
+        ),
+      ],
     );
   }
 }
