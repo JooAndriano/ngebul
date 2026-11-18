@@ -5,7 +5,7 @@ import '../core/number_format.dart';
 import '../data/pesan_data.dart';
 import '../models/pesan_types.dart';
 import '../models/sim_config.dart';
-import '../models/sim_types.dart';
+import '../models/toko.dart';
 import 'rumus_sim.dart';
 
 class PembuatPesan {
@@ -16,15 +16,16 @@ class PembuatPesan {
 
   T _acak<T>(List<T> list) => list[_random.nextInt(list.length)];
 
-  /// Info harga pokok dari pasar. Hanya info; modal tidak diubah di sini.
+  /// Info harga pokok dari pasar. Bahan dipilih dari katalog toko pertama;
+  /// dampak dihitung untuk semua toko. Hanya info; modal tidak diubah di sini.
   Pesan hargaPokok({
     required int id,
     required int hari,
     required double jam,
-    required List<MenuWarung> menu,
+    required List<Toko> tokos,
   }) {
     final p = config.pesan;
-    final bahan = _acak(p.bahan);
+    final bahan = _acak(tokos.first.katalog.bahan);
     final perubahan =
         p.perubahanHargaPokokMin +
         _random.nextDouble() *
@@ -32,16 +33,20 @@ class PembuatPesan {
     final template = _acak(PesanData.templateHargaPokok);
 
     final dampak = <DampakModal>[];
-    for (final m in menu) {
-      final porsi = bahan.porsiModal[m.id];
-      if (porsi == null) continue;
-      dampak.add(
-        DampakModal(
-          menuId: m.id,
-          modalLama: m.modal,
-          modalBaru: RumusSim.modalBaru(config, m.modal, perubahan, porsi),
-        ),
-      );
+    for (final t in tokos) {
+      for (final i in t.katalog.item) {
+        final porsi = bahan.porsiModal[i.id];
+        if (porsi == null) continue;
+        final modal = t.modal[i.id]!;
+        dampak.add(
+          DampakModal(
+            tokoId: t.id,
+            itemId: i.id,
+            modalLama: modal,
+            modalBaru: RumusSim.modalBaru(config, modal, perubahan, porsi),
+          ),
+        );
+      }
     }
 
     final isi = template

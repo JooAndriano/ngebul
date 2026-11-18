@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/sim_data.dart';
 import '../../sim/sim_controller.dart';
+import '../../sim/simulation_engine.dart';
 
 /// Kolom ikon di tepi kanan layar untuk membuka panel.
 class IkonTepi extends ConsumerWidget {
@@ -15,7 +16,8 @@ class IkonTepi extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final e = ref.watch(simControllerProvider).engine;
+    final v = ref.watch(simControllerProvider);
+    final e = v.engine;
     final baru = e.jumlahPesanBaru;
 
     return Container(
@@ -25,10 +27,12 @@ class IkonTepi extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _Ikon(
-            emoji: TampilanData.emojiPanelEtalase,
-            label: 'Etalase',
-            badge: e.adaStokMenipis ? const Badge(smallSize: 10) : null,
-            onTap: () => onBuka(JenisPanel.etalase),
+            emoji: TampilanData.emojiPanelKelola,
+            label: 'Kelola',
+            badge: e.adaStokMenipis(v.toko.id)
+                ? const Badge(smallSize: 10)
+                : null,
+            onTap: () => onBuka(JenisPanel.kelola),
           ),
           _Ikon(
             emoji: TampilanData.emojiPanelPesan,

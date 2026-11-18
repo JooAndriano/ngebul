@@ -5,12 +5,11 @@ import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/app.dart';
 
+import 'fake_random.dart';
 import 'helper.dart';
 
 void main() {
-  testWidgets('landscape: etalase, pesanan 2 klik, ormas, laporan', (
-    tester,
-  ) async {
+  testWidgets('pilih usaha, pick & pack, kelola, laporan', (tester) async {
     tester.view.physicalSize = const Size(2340, 1080); // 780 x 360 dp
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -22,7 +21,12 @@ void main() {
           simControllerProvider.overrideWith(
             () => SimController(
               jalankanLoop: false,
-              buatEngine: () => engine = buatEngine(),
+              buatEngine: (jenis) => engine = SimulationEngine(
+                jenisUsaha: jenis,
+                random: FakeRandom(),
+                kedatanganOtomatis: false,
+                jadwalAcakHarian: false,
+              ),
             ),
           ),
         ],
@@ -33,56 +37,61 @@ void main() {
       tester.element(find.byType(NgebulApp)),
     ).read(simControllerProvider.notifier);
 
+    // Layar pilih jenis usaha.
+    expect(find.text('Warung Sembako'), findsOneWidget);
+    expect(find.text('Warung Makanan'), findsOneWidget);
+    await tester.tap(find.text('Warung Makanan'));
+    await tester.pumpAndSettle();
     expect(find.text('Rp 200.000'), findsOneWidget);
     expect(find.textContaining('Hari ke-1'), findsOneWidget);
 
-    // Etalase tersembunyi di panel 🍱; waktu berhenti saat panel terbuka.
-    expect(find.text('Es Teh Manis'), findsNothing);
-    await tester.tap(find.text('Etalase'));
+    // Pelanggan datang; ketuk 💬 -> panel Layani.
+    datang(engine, pesananItem({'es_teh': 1}));
+    ctrl.setJeda(false); // memicu rebuild
+    await tester.pump();
+    expect(find.text('💬'), findsOneWidget);
+    await tester.tap(find.text('🧒'));
     await tester.pumpAndSettle();
-    expect(find.text('Es Teh Manis'), findsOneWidget);
+    expect(find.text('0/1'), findsOneWidget);
+    expect(find.text('Makanan Berat'), findsOneWidget); // tab rak
+
+    // Salah ambil dari tab pertama.
+    await tester.tap(find.text('sisa 5').first); // Nasi Goreng
+    await tester.pump();
+    expect(find.textContaining('Salah ambil'), findsOneWidget);
+
+    // Ambil Es Teh dari tab Minuman, lalu berikan.
+    await tester.tap(find.text('Minuman'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('sisa 5'));
+    await tester.pump();
+    expect(find.text('1/1'), findsOneWidget);
+    await tester.tap(find.textContaining('Berikan'));
+    await tester.pump();
+    expect(find.text('Rp 203.450'), findsOneWidget); // 3.000 + tip 450
+    expect(find.textContaining('Kilat'), findsWidgets);
+    await tester.pumpAndSettle();
+    expect(find.text('0/1'), findsNothing); // panel tertutup
+
+    // Panel Kelola (waktu berhenti).
+    await tester.tap(find.text('Kelola'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nasi Goreng'), findsOneWidget);
+    expect(find.text('Combo'), findsOneWidget);
     expect(
       ProviderScope.containerOf(
         tester.element(find.byType(NgebulApp)),
       ).read(simControllerProvider).waktuBerhenti,
       isTrue,
     );
-    await tester.tap(find.text('+10').first);
-    await tester.pump();
-    expect(find.text('Rp 190.000'), findsOneWidget);
-    await tester.tap(find.byTooltip('Tutup'));
-    await tester.pumpAndSettle();
-    expect(find.text('Es Teh Manis'), findsNothing);
-
-    // Pesanan 2 klik.
-    engine.prosesKedatangan();
-    ctrl.setJeda(false); // memicu rebuild
-    await tester.pump();
-    expect(find.text('💬'), findsOneWidget);
-    await tester.tap(find.text('🧒'));
-    await tester.pump();
-    expect(find.text('💬'), findsNothing);
-    expect(find.text('🥤'), findsOneWidget); // balon berisi pesanan
-    await tester.tap(find.text('🧒'));
-    await tester.pump();
-    expect(find.text('Rp 193.000'), findsOneWidget);
-    expect(find.text('+Rp 3.000'), findsOneWidget);
-    await tester.pumpAndSettle();
-
-    // Ormas: banner dengan tombol, bayar.
-    ctrl.munculkanOrmas();
-    await tester.pump();
-    expect(find.textContaining('Jatah Rp 20.000'), findsWidgets);
-    await tester.tap(find.text('Bayar'));
-    await tester.pump();
-    expect(find.text('Rp 173.000'), findsOneWidget);
+    await tester.tap(find.byTooltip('Tutup panel'));
     await tester.pumpAndSettle();
 
     // Akhir hari -> dialog laporan.
     ctrl.debugLewatiKeAkhirHari();
     await tester.pumpAndSettle();
     expect(find.text('Laporan Hari ke-1'), findsOneWidget);
-    expect(find.text('Jatah ormas'), findsOneWidget);
+    expect(find.text('Combo terjual'), findsOneWidget);
     await tester.tap(find.text('Hari Berikutnya'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Hari ke-2'), findsOneWidget);

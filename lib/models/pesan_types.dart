@@ -1,4 +1,4 @@
-/// Bahan pokok dan menu yang modalnya terpengaruh.
+/// Bahan pokok dan item yang modalnya terpengaruh.
 class BahanData {
   const BahanData({
     required this.id,
@@ -9,7 +9,7 @@ class BahanData {
   final String id;
   final String nama;
 
-  /// menuId -> porsi modal menu yang berasal dari bahan ini (0..1).
+  /// itemId -> porsi modal item yang berasal dari bahan ini (0..1).
   /// Modal baru = modal x (1 + perubahan x porsi).
   final Map<String, double> porsiModal;
 }
@@ -36,15 +36,17 @@ enum JawabanPesan {
   final String label;
 }
 
-/// Perkiraan dampak harga pokok ke satu menu.
+/// Perkiraan dampak harga pokok ke satu item di satu toko.
 class DampakModal {
   const DampakModal({
-    required this.menuId,
+    required this.tokoId,
+    required this.itemId,
     required this.modalLama,
     required this.modalBaru,
   });
 
-  final String menuId;
+  final String tokoId;
+  final String itemId;
   final double modalLama;
   final double modalBaru;
 }

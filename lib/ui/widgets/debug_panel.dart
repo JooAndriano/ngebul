@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
-import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 
 /// Kontrol debug. Ikon pembukanya hanya ada jika kDebugMode.
@@ -14,6 +13,7 @@ class DebugPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final v = ref.watch(simControllerProvider);
     final e = v.engine;
+    final t = v.toko;
     final c = ref.read(simControllerProvider.notifier);
 
     void tutup() => Navigator.of(context).pop();
@@ -39,20 +39,9 @@ class DebugPanel extends ConsumerWidget {
         ),
         SwitchListTile(
           title: const Text('Kasir otomatis'),
-          subtitle: Text(
-            'Terima pesanan tiap '
-            '${e.config.intervalKasirOtomatis.toStringAsFixed(0)} dtk',
-          ),
-          value: e.modeKasir == ModeKasir.terimaPesanan,
-          onChanged: (on) =>
-              c.setModeKasir(on ? ModeKasir.terimaPesanan : ModeKasir.mati),
-        ),
-        SwitchListTile(
-          title: const Text('Kasir penuh'),
-          subtitle: const Text('Terima + berikan pesanan'),
-          value: e.modeKasir == ModeKasir.penuh,
-          onChanged: (on) =>
-              c.setModeKasir(on ? ModeKasir.penuh : ModeKasir.mati),
+          subtitle: const Text('Calon fitur pekerja: tanpa tip, +0,2 reputasi'),
+          value: t.kasirOtomatis,
+          onChanged: c.setKasirOtomatis,
         ),
         const Divider(),
         Wrap(
@@ -64,7 +53,7 @@ class DebugPanel extends ConsumerWidget {
               child: Text('+${formatRupiah(DebugData.tambahUang)}'),
             ),
             OutlinedButton(
-              onPressed: e.ormas == null && !e.hariSelesai
+              onPressed: t.ormas == null && t.buka && !e.hariSelesai
                   ? () {
                       c.munculkanOrmas();
                       tutup();
@@ -90,8 +79,15 @@ class DebugPanel extends ConsumerWidget {
               child: const Text('Akhiri hari'),
             ),
             OutlinedButton(
-              onPressed: () => c.debugKeHariBerikutnya(),
+              onPressed: c.debugKeHariBerikutnya,
               child: const Text('Ke hari berikutnya'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                tutup();
+                c.ulangPilihUsaha();
+              },
+              child: const Text('Ulang pilih jenis usaha'),
             ),
           ],
         ),

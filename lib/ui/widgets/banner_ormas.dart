@@ -5,6 +5,7 @@ import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
+import '../../sim/simulation_engine.dart';
 
 /// Banner pilihan saat ormas hadir. Game tidak pause.
 class BannerOrmas extends ConsumerWidget {
@@ -12,13 +13,14 @@ class BannerOrmas extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final e = ref.watch(simControllerProvider).engine;
-    final o = e.ormas;
+    final v = ref.watch(simControllerProvider);
+    final e = v.engine;
+    final o = v.toko.ormas;
     if (o == null) return const SizedBox.shrink();
     final c = e.config.ormas;
     final ctrl = ref.read(simControllerProvider.notifier);
     final theme = Theme.of(context);
-    final tingkat = e.tingkatPeringatanOrmas;
+    final tingkat = e.tingkatPeringatanOrmas(v.toko.id);
     final tawar = o.jatah * c.porsiTawar;
 
     final warna = switch (tingkat) {

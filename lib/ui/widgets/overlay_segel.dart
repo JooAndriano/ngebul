@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
 import '../../sim/sim_controller.dart';
+import '../../sim/simulation_engine.dart';
 
 /// Overlay hari disegel penuh, dengan tombol tebus segel.
 class OverlaySegel extends ConsumerWidget {
@@ -11,8 +12,9 @@ class OverlaySegel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final e = ref.watch(simControllerProvider).engine;
-    final denda = e.dendaTebusSegel;
+    final v = ref.watch(simControllerProvider);
+    final e = v.engine;
+    final denda = e.dendaTebusSegel(v.toko.id);
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.55),
       child: Center(

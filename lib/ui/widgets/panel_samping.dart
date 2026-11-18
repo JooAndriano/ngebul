@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/sim_data.dart';
 import '../../sim/sim_controller.dart';
 import 'debug_panel.dart';
-import 'etalase_list.dart';
+import 'panel_kelola.dart';
 import 'panel_pesan.dart';
 import 'panel_warung.dart';
 
@@ -17,10 +17,10 @@ class PanelSamping extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (emoji, judul, isi) = switch (panel) {
-      JenisPanel.etalase => (
-        TampilanData.emojiPanelEtalase,
-        'Etalase',
-        const EtalaseList() as Widget,
+      JenisPanel.kelola => (
+        TampilanData.emojiPanelKelola,
+        'Kelola Barang',
+        const PanelKelola() as Widget,
       ),
       JenisPanel.pesan => (
         TampilanData.emojiPanelPesan,
@@ -46,10 +46,11 @@ class PanelSamping extends StatelessWidget {
         child: Column(
           children: [
             ListTile(
-              leading: Text(emoji, style: const TextStyle(fontSize: 24)),
+              dense: true,
+              leading: Text(emoji, style: const TextStyle(fontSize: 22)),
               title: Text(judul, style: Theme.of(context).textTheme.titleLarge),
               trailing: IconButton(
-                tooltip: 'Tutup',
+                tooltip: 'Tutup panel',
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(context).pop(),
               ),

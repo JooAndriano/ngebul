@@ -135,11 +135,13 @@ class _DetailPesan extends StatelessWidget {
   List<Widget> _infoHargaPokok(BuildContext context) {
     final theme = Theme.of(context);
     return [
-      Text('Menu terdampak', style: theme.textTheme.titleSmall),
+      Text('Barang terdampak', style: theme.textTheme.titleSmall),
+      if (pesan.dampak.isEmpty)
+        Text('Tidak ada di toko kamu.', style: theme.textTheme.bodySmall),
       for (final d in pesan.dampak)
         Builder(
           builder: (context) {
-            final m = engine.menuById(d.menuId).data;
+            final m = engine.toko(d.tokoId).katalog.itemById(d.itemId);
             return ListTile(
               dense: true,
               leading: Text(m.emoji, style: const TextStyle(fontSize: 20)),

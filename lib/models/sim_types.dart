@@ -1,4 +1,4 @@
-import 'menu_data.dart';
+import 'pesanan.dart';
 import 'tipe_pelanggan_data.dart';
 
 enum Sisi { kiri, kanan }
@@ -17,62 +17,34 @@ enum StatusEtalase { laris, normal, sepi }
 
 enum HasilIsiStok { berhasil, uangKurang, stokPenuh, terkunci }
 
-/// Mode kasir otomatis (debug).
-enum ModeKasir {
-  /// Semua manual.
-  mati,
-
-  /// Otomatis menerima pesanan (langkah 1); memberikan tetap manual.
-  terimaPesanan,
-
-  /// Otomatis menerima dan memberikan.
-  penuh,
-}
-
 enum StatusPelanggan {
-  /// Balon 💬: menunggu pesanannya ditanya.
+  /// Balon 💬: menunggu dilayani.
   menunggu,
 
-  /// Balon berisi emoji menu: menunggu pesanan diberikan.
-  pesananDiterima,
+  /// Panel Layani sedang terbuka untuk pelanggan ini.
+  dilayani,
 
-  /// Balon 🚫: stok habis, sebentar lagi pergi.
+  /// Sedang diproses kasir otomatis.
+  diprosesKasir,
+
+  /// Balon 🚫: pesanan batal karena stok habis, sebentar lagi pergi.
   pergiStokHabis,
 }
 
-/// Kondisi satu menu saat permainan berjalan.
-/// Hanya diubah oleh SimulationEngine; UI cukup membaca.
-class MenuWarung {
-  MenuWarung(this.data)
-    : harga = data.hargaWajar,
-      modal = data.modal,
-      terbuka = !data.terkunciAwal;
-
-  final MenuData data;
-  int stok = 0;
-  double harga;
-
-  /// Modal per porsi saat ini (bisa berubah jika harga pokok diterapkan).
-  double modal;
-  bool terbuka;
-
-  String get id => data.id;
-  double get rasioHarga => harga / data.hargaWajar;
-  double get untungPerPorsi => harga - modal;
-}
+enum RatingKecepatan { kilat, lancar, mepet }
 
 /// Pelanggan di antrean. Hanya diubah oleh SimulationEngine.
 class Pelanggan {
   Pelanggan({
     required this.id,
     required this.tipe,
-    required this.menuId,
+    required this.pesanan,
     required this.kesabaranAwal,
   }) : sisaKesabaran = kesabaranAwal;
 
   final int id;
   final TipePelangganData tipe;
-  final String menuId;
+  final Pesanan pesanan;
   final double kesabaranAwal;
   double sisaKesabaran;
   StatusPelanggan status = StatusPelanggan.menunggu;
@@ -84,39 +56,67 @@ class Pelanggan {
       kesabaranAwal <= 0 ? 0 : (sisaKesabaran / kesabaranAwal).clamp(0, 1);
 }
 
-enum JenisHasilKetuk { pesananDiterima, dilayani, stokHabis }
+enum HasilAmbil { masuk, salahAmbil, stokKurang, tidakAdaSesi }
 
-/// Hasil mengetuk pelanggan terdepan.
-class HasilKetuk {
-  const HasilKetuk({
-    required this.jenis,
+/// Hasil memberikan pesanan (penuh atau sebagian).
+class HasilLayani {
+  const HasilLayani({
     required this.pelanggan,
-    this.pendapatan = 0,
+    required this.rating,
+    required this.total,
+    required this.tip,
+    required this.sebagian,
   });
 
-  final JenisHasilKetuk jenis;
   final Pelanggan pelanggan;
-  final double pendapatan;
+
+  /// null = dilayani kasir otomatis (tanpa rating).
+  final RatingKecepatan? rating;
+  final double total;
+  final double tip;
+  final bool sebagian;
 }
 
-/// Kejadian terbaru untuk ditampilkan sebagai umpan balik.
+/// Kejadian terbaru untuk umpan balik di scene.
 class Kejadian {
   const Kejadian({
     required this.tipe,
-    required this.menuId,
     this.pendapatan = 0,
     this.alasanPergi,
+    this.rating,
   });
 
   final TipePelangganData tipe;
-  final String menuId;
   final double pendapatan;
 
   /// null = berhasil dilayani.
   final AlasanPergi? alasanPergi;
+  final RatingKecepatan? rating;
 }
 
-/// Ormas yang sedang hadir. Hanya diubah oleh SimulationEngine.
+enum JenisAlert { stokHabis, stokMenipis, ormasHadir, segel }
+
+/// Peringatan yang dipancarkan engine; UI menampilkannya sebagai snackbar.
+class AlertEvent {
+  const AlertEvent({
+    required this.id,
+    required this.jenis,
+    required this.tokoId,
+    required this.hari,
+    required this.jam,
+    this.itemId,
+  });
+
+  /// Naik terus; UI memakai ini untuk tahu alert mana yang baru.
+  final int id;
+  final JenisAlert jenis;
+  final String tokoId;
+  final String? itemId;
+  final int hari;
+  final double jam;
+}
+
+/// Ormas yang sedang hadir di satu toko. Hanya diubah oleh SimulationEngine.
 class KunjunganOrmas {
   KunjunganOrmas({required this.jatah});
 
@@ -146,44 +146,70 @@ enum StatusSegel {
   final String label;
 }
 
-class LaporanHarian {
-  const LaporanHarian({
-    required this.hari,
+/// Laporan harian satu toko.
+class LaporanToko {
+  const LaporanToko({
+    required this.tokoId,
+    required this.namaToko,
     required this.pendapatan,
+    required this.tip,
     required this.hpp,
     required this.biayaHarian,
     required this.jatahOrmas,
     required this.dendaSegel,
-    required this.dikirimKeKeluarga,
     required this.dilayani,
+    required this.perRating,
+    required this.comboTerjual,
+    required this.pesananSebagian,
+    required this.pesananDitolak,
     required this.hilang,
     required this.perubahanReputasi,
-    required this.menuTerlarisId,
+    required this.itemTerlarisId,
     required this.jumlahTerlaris,
-    required this.uangAkhir,
     required this.statusSegel,
   });
 
-  final int hari;
+  final String tokoId;
+  final String namaToko;
   final double pendapatan;
+  final double tip;
   final double hpp;
   final double biayaHarian;
   final double jatahOrmas;
   final double dendaSegel;
-
-  /// Terpisah: tidak dihitung dalam untung usaha.
-  final double dikirimKeKeluarga;
   final int dilayani;
+  final Map<RatingKecepatan, int> perRating;
+  final int comboTerjual;
+  final int pesananSebagian;
+  final int pesananDitolak;
   final Map<AlasanPergi, int> hilang;
   final double perubahanReputasi;
 
   /// null jika tidak ada yang terjual.
-  final String? menuTerlarisId;
+  final String? itemTerlarisId;
   final int jumlahTerlaris;
-  final double uangAkhir;
   final StatusSegel statusSegel;
 
   double get untungBersih =>
-      pendapatan - hpp - biayaHarian - jatahOrmas - dendaSegel;
+      pendapatan + tip - hpp - biayaHarian - jatahOrmas - dendaSegel;
   int get totalHilang => hilang.values.fold(0, (a, b) => a + b);
+}
+
+/// Laporan harian seluruh usaha.
+class LaporanHarian {
+  const LaporanHarian({
+    required this.hari,
+    required this.toko,
+    required this.dikirimKeKeluarga,
+    required this.uangAkhir,
+  });
+
+  final int hari;
+  final List<LaporanToko> toko;
+
+  /// Terpisah: tidak dihitung dalam untung usaha.
+  final double dikirimKeKeluarga;
+  final double uangAkhir;
+
+  double get untungBersih => toko.fold(0, (a, t) => a + t.untungBersih);
 }

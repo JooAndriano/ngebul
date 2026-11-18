@@ -1,5 +1,6 @@
-import 'menu_data.dart';
+import 'katalog.dart';
 import 'pesan_types.dart';
+import 'sim_types.dart';
 import 'tipe_pelanggan_data.dart';
 
 /// Satu fase dalam sehari.
@@ -112,7 +113,7 @@ class OrmasConfig {
   final double dendaMinimal;
 }
 
-/// Pesan masuk (SMS).
+/// Pesan masuk (SMS). Bahan pokok ada di katalog tiap jenis usaha.
 class PesanConfig {
   const PesanConfig({
     required this.pengirimHargaPokok,
@@ -122,7 +123,6 @@ class PesanConfig {
     required this.perubahanHargaPokokMaks,
     required this.terapkanHargaPokok,
     required this.pembulatanModal,
-    required this.bahan,
     required this.pengirimKeluarga,
     required this.hariMulaiKeluarga,
     required this.peluangKeluargaPerHari,
@@ -143,10 +143,9 @@ class PesanConfig {
   final double perubahanHargaPokokMin;
   final double perubahanHargaPokokMaks;
 
-  /// False = hanya info; modal menu tidak berubah.
+  /// False = hanya info; modal tidak berubah.
   final bool terapkanHargaPokok;
   final double pembulatanModal;
-  final List<BahanData> bahan;
 
   // Permintaan keluarga
   final List<PengirimData> pengirimKeluarga;
@@ -164,15 +163,35 @@ class PesanConfig {
   final double porsiKirimSetengah;
 }
 
-/// Semua angka simulasi. Isinya ada di `lib/data/sim_data.dart`;
-/// nanti dimuat dari JSON / Remote Config.
+/// Ambang & hadiah satu rating kecepatan melayani.
+class RatingConfig {
+  const RatingConfig({
+    required this.rating,
+    required this.ambangMin,
+    required this.persenTip,
+    required this.reputasi,
+    required this.emoji,
+    required this.label,
+  });
+
+  final RatingKecepatan rating;
+
+  /// Rating berlaku jika sisaKesabaran/total >= ambangMin.
+  final double ambangMin;
+  final double persenTip;
+  final double reputasi;
+  final String emoji;
+  final String label;
+}
+
+/// Semua angka simulasi. Isinya ada di `lib/data/`; nanti dimuat dari
+/// JSON / Remote Config.
 class SimConfig {
   const SimConfig({
     required this.detikPerHari,
     required this.jamBuka,
     required this.jamTutup,
     required this.fase,
-    required this.uangAwal,
     required this.reputasiAwal,
     required this.reputasiMin,
     required this.reputasiMaks,
@@ -186,26 +205,36 @@ class SimConfig {
     required this.rasioHargaMin,
     required this.rasioHargaMaks,
     required this.stepHarga,
+    required this.rasioComboDefault,
+    required this.rasioComboMin,
+    required this.rasioComboMaks,
+    required this.stepAturHargaKategori,
     required this.pilihanIsiStok,
+    required this.stokAwal,
     required this.ambangStokMenipis,
-    required this.reputasiStokHabis,
+    required this.ambangAlertStokMenipis,
+    required this.kesabaranPerUnit,
+    required this.penaltiSalahAmbil,
+    required this.rating,
+    required this.reputasiBeriSebagian,
+    required this.reputasiTolak,
     required this.reputasiAntreanPenuh,
     required this.reputasiAntreLama,
-    required this.reputasiLayaniCepat,
-    required this.reputasiLayaniLambat,
-    required this.ambangLayaniCepat,
-    required this.durasiTampilStokHabis,
-    required this.intervalKasirOtomatis,
+    required this.durasiTampilPergi,
+    required this.kasirDurasiDasar,
+    required this.kasirDurasiPerUnit,
+    required this.kasirReputasi,
     required this.biayaSewaHarian,
     required this.ambangLaris,
     required this.ambangNormal,
     required this.langkahSimulasiMaks,
     required this.pauseSaatPanelTerbuka,
+    required this.maksAlert,
     required this.ekspansi,
     required this.ormas,
     required this.pesan,
-    required this.menu,
     required this.tipePelanggan,
+    required this.katalog,
   });
 
   // Waktu
@@ -214,8 +243,7 @@ class SimConfig {
   final double jamTutup;
   final List<FaseData> fase;
 
-  // Awal permainan
-  final double uangAwal;
+  // Reputasi (per toko)
   final double reputasiAwal;
   final double reputasiMin;
   final double reputasiMaks;
@@ -230,39 +258,63 @@ class SimConfig {
   final double faktorReputasiDasar;
   final double faktorReputasiSkala;
 
-  /// dayaTarik per menu = clamp(1 + koef x (1 - rasio), min, maks).
+  /// dayaTarik per item = clamp(1 + koef x (1 - rasio), min, maks).
   final double dayaTarikKoefisien;
   final double dayaTarikMin;
   final double dayaTarikMaks;
 
-  // Harga
+  // Harga item
   final double rasioHargaMin;
   final double rasioHargaMaks;
   final double stepHarga;
 
+  // Harga combo (relatif terhadap jumlah harga wajar isinya)
+  final double rasioComboDefault;
+  final double rasioComboMin;
+  final double rasioComboMaks;
+
+  /// Tombol massal "Atur harga kategori" +/- pecahan ini.
+  final double stepAturHargaKategori;
+
   // Stok
   final List<int> pilihanIsiStok;
 
-  /// Badge etalase jika stok <= pecahan ini x kapasitas.
+  /// Stok awal tiap item terbuka (hadiah awal).
+  final int stokAwal;
+
+  /// Badge 🍱 & "isi semua yang menipis": stok <= pecahan ini x kapasitas.
   final double ambangStokMenipis;
 
-  // Reputasi
-  final double reputasiStokHabis;
+  /// Alert stok menipis: stok <= pecahan ini x kapasitas.
+  final double ambangAlertStokMenipis;
+
+  // Pick & pack
+  /// Kesabaran total = dasar tipe + ini x total unit pesanan.
+  final double kesabaranPerUnit;
+
+  /// Kesabaran berkurang sekian detik tiap salah ambil.
+  final double penaltiSalahAmbil;
+
+  /// Urut dari ambang tertinggi.
+  final List<RatingConfig> rating;
+  final double reputasiBeriSebagian;
+  final double reputasiTolak;
+
+  // Reputasi lain
   final double reputasiAntreanPenuh;
   final double reputasiAntreLama;
-  final double reputasiLayaniCepat;
-  final double reputasiLayaniLambat;
 
-  /// Sisa kesabaran (pecahan) di atas ambang ini = dilayani cepat.
-  final double ambangLayaniCepat;
+  /// Lama pelanggan menampilkan 🚫 sebelum pergi.
+  final double durasiTampilPergi;
 
-  /// Lama pelanggan menampilkan 🚫 sebelum pergi karena stok habis.
-  final double durasiTampilStokHabis;
-
-  /// Kasir otomatis (debug) bertindak tiap sekian detik.
-  final double intervalKasirOtomatis;
+  // Kasir otomatis (debug, calon fitur pekerja)
+  /// Durasi proses = dasar + perUnit x total unit.
+  final double kasirDurasiDasar;
+  final double kasirDurasiPerUnit;
+  final double kasirReputasi;
 
   // Ekonomi harian
+  /// Sewa lapak per toko per hari.
   final double biayaSewaHarian;
 
   // Status etalase (peluang beli rata-rata)
@@ -272,13 +324,18 @@ class SimConfig {
   /// Langkah simulasi terbesar; tick besar dipecah menjadi langkah ini.
   final double langkahSimulasiMaks;
 
-  /// Waktu berhenti selama panel samping terbuka.
+  /// Waktu berhenti selama panel samping (bukan panel Layani) terbuka.
   final bool pauseSaatPanelTerbuka;
+
+  /// Jumlah alert yang disimpan.
+  final int maksAlert;
 
   final EkspansiConfig ekspansi;
   final OrmasConfig ormas;
   final PesanConfig pesan;
-
-  final List<MenuData> menu;
   final List<TipePelangganData> tipePelanggan;
+  final Map<JenisUsaha, KatalogData> katalog;
+
+  TipePelangganData tipeById(String id) =>
+      tipePelanggan.firstWhere((t) => t.id == id);
 }

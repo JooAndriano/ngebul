@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../sim/sim_controller.dart';
 import 'home_screen.dart';
+import 'pilih_usaha_screen.dart';
 
 class NgebulApp extends StatelessWidget {
   const NgebulApp({super.key});
@@ -14,7 +17,14 @@ class NgebulApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: Consumer(
+        builder: (context, ref, _) {
+          final belumMulai = ref.watch(
+            simControllerProvider.select((v) => v.engineAtauNull == null),
+          );
+          return belumMulai ? const PilihUsahaScreen() : const HomeScreen();
+        },
+      ),
     );
   }
 }
