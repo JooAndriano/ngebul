@@ -8,93 +8,196 @@ import '../../sim/simulation_engine.dart';
 import 'ui_helper.dart';
 
 /// Isi laporan harian; dipakai di panel Warung dan dialog akhir hari.
-class LaporanView extends StatelessWidget {
-  const LaporanView({super.key, required this.laporan, required this.engine});
+/// Multi-toko: tab per toko + ringkasan gabungan.
+class LaporanView extends StatefulWidget {
+  const LaporanView({
+    super.key,
+    required this.laporan,
+    required this.engine,
+    this.tokoAwal,
+  });
 
   final LaporanHarian laporan;
   final SimulationEngine engine;
 
+  /// Tab yang dipilih pertama kali (null = ringkasan).
+  final String? tokoAwal;
+
+  @override
+  State<LaporanView> createState() => _LaporanViewState();
+}
+
+class _LaporanViewState extends State<LaporanView> {
+  /// null = ringkasan gabungan.
+  late String? _tab = widget.laporan.toko.length > 1
+      ? null
+      : widget.laporan.toko.single.tokoId;
+
+  @override
+  void initState() {
+    super.initState();
+    final awal = widget.tokoAwal;
+    if (awal != null && widget.laporan.toko.any((l) => l.tokoId == awal)) {
+      _tab = widget.laporan.toko.length > 1 ? null : awal;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    Widget baris(
-      String label,
-      String nilai, {
-      bool tebal = false,
-      Color? warna,
-      double indent = 0,
-    }) {
-      final style = TextStyle(
-        fontWeight: tebal ? FontWeight.bold : null,
-        color: warna,
-      );
-      return Padding(
-        padding: EdgeInsets.fromLTRB(indent, 2, 0, 2),
-        child: Row(
-          children: [
-            Expanded(child: Text(label, style: style)),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(nilai, style: style, textAlign: TextAlign.end),
-            ),
-          ],
-        ),
-      );
-    }
-
+    final laporan = widget.laporan;
     final multiToko = laporan.toko.length > 1;
+    final dipilih = laporan.toko.where((l) => l.tokoId == _tab).firstOrNull;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final l in laporan.toko) ...[
-          if (multiToko) Text(l.namaToko, style: theme.textTheme.titleSmall),
-          baris('Pendapatan', formatRupiah(l.pendapatan)),
-          baris('Tip', formatRupiah(l.tip)),
-          baris('HPP (modal terjual)', '-${formatRupiah(l.hpp)}'),
-          baris('Sewa lapak', '-${formatRupiah(l.biayaHarian)}'),
-          baris('Jatah ormas', '-${formatRupiah(l.jatahOrmas)}'),
-          if (l.dendaSegel > 0)
-            baris('Denda tebus segel', '-${formatRupiah(l.dendaSegel)}'),
-          const Divider(),
-          baris(
-            'Untung bersih',
-            formatRupiah(l.untungBersih),
-            tebal: true,
-            warna: l.untungBersih < 0 ? theme.colorScheme.error : Colors.green,
+        if (multiToko) ...[
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              ChoiceChip(
+                label: const Text('Ringkasan'),
+                selected: dipilih == null,
+                onSelected: (_) => setState(() => _tab = null),
+              ),
+              for (final l in laporan.toko)
+                ChoiceChip(
+                  label: Text(l.namaToko),
+                  selected: dipilih?.tokoId == l.tokoId,
+                  onSelected: (_) => setState(() => _tab = l.tokoId),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          baris('Pesanan dilayani', '${l.dilayani}'),
-          for (final r in RatingKecepatan.values)
-            baris(
-              '• ${labelRating(engine, r)}',
-              '${l.perRating[r] ?? 0}',
-              indent: 12,
-            ),
-          baris('Combo terjual', '${l.comboTerjual}'),
-          baris(
-            'Barang terlaris',
-            l.itemTerlarisId == null
-                ? '-'
-                : '${labelItem(engine.toko(l.tokoId), l.itemTerlarisId!)} '
-                      '(${l.jumlahTerlaris})',
-          ),
-          baris('Pesanan sebagian', '${l.pesananSebagian}'),
-          baris('Pesanan ditolak', '${l.pesananDitolak}'),
-          baris('Pelanggan hilang', '${l.totalHilang}'),
-          for (final a in AlasanPergi.values)
-            baris('• ${a.label}', '${l.hilang[a] ?? 0}', indent: 12),
-          baris('Perubahan reputasi', formatDelta(l.perubahanReputasi)),
-          baris('Status segel', l.statusSegel.label),
-          const Divider(),
         ],
-        baris(
+        if (dipilih == null)
+          ..._ringkasan(theme, laporan)
+        else
+          ..._perToko(theme, dipilih),
+        const Divider(),
+        _Baris(
           'Dikirim ke keluarga (di luar usaha)',
           formatRupiah(laporan.dikirimKeKeluarga),
         ),
-        baris('Uang akhir', formatRupiah(laporan.uangAkhir), tebal: true),
+        _Baris('Uang akhir', formatRupiah(laporan.uangAkhir), tebal: true),
       ],
+    );
+  }
+
+  Color _warnaUntung(ThemeData theme, double untung) =>
+      untung < 0 ? theme.colorScheme.error : Colors.green;
+
+  List<Widget> _ringkasan(ThemeData theme, LaporanHarian l) => [
+    _Baris('Pendapatan', formatRupiah(l.pendapatan)),
+    _Baris('Tip', formatRupiah(l.tip)),
+    _Baris('HPP (modal terjual)', '-${formatRupiah(l.hpp)}'),
+    _Baris('Sewa lapak', '-${formatRupiah(l.sewa)}'),
+    _Baris('Gaji kasir', '-${formatRupiah(l.gajiKasir)}'),
+    _Baris('Jatah ormas', '-${formatRupiah(l.jatahOrmas)}'),
+    if (l.dendaSegel > 0)
+      _Baris('Denda tebus segel', '-${formatRupiah(l.dendaSegel)}'),
+    const Divider(),
+    _Baris(
+      'Untung bersih (semua toko)',
+      formatRupiah(l.untungBersih),
+      tebal: true,
+      warna: _warnaUntung(theme, l.untungBersih),
+    ),
+    const SizedBox(height: 8),
+    _Baris('Pesanan dilayani', '${l.dilayani}'),
+    _Baris('Pelanggan hilang', '${l.totalHilang}'),
+    _Baris('Alert dikirim', '${l.alertDikirim}'),
+    const SizedBox(height: 8),
+    for (final t in l.toko)
+      _Baris(
+        '• ${t.namaToko} (${t.statusSegel.label})',
+        formatRupiah(t.untungBersih),
+        indent: 12,
+        warna: _warnaUntung(theme, t.untungBersih),
+      ),
+  ];
+
+  List<Widget> _perToko(ThemeData theme, LaporanToko l) {
+    final e = widget.engine;
+    return [
+      _Baris('Pendapatan', formatRupiah(l.pendapatan)),
+      _Baris('Tip', formatRupiah(l.tip)),
+      _Baris('HPP (modal terjual)', '-${formatRupiah(l.hpp)}'),
+      _Baris('Sewa lapak', '-${formatRupiah(l.biayaHarian)}'),
+      _Baris(
+        l.kasirLevel > 0 ? 'Gaji kasir (Lv${l.kasirLevel})' : 'Gaji kasir',
+        '-${formatRupiah(l.gajiKasir)}',
+      ),
+      _Baris('Jatah ormas', '-${formatRupiah(l.jatahOrmas)}'),
+      if (l.dendaSegel > 0)
+        _Baris('Denda tebus segel', '-${formatRupiah(l.dendaSegel)}'),
+      const Divider(),
+      _Baris(
+        'Untung bersih',
+        formatRupiah(l.untungBersih),
+        tebal: true,
+        warna: _warnaUntung(theme, l.untungBersih),
+      ),
+      const SizedBox(height: 8),
+      _Baris('Pesanan dilayani', '${l.dilayani}'),
+      _Baris('• oleh kasir', '${l.dilayaniKasir}', indent: 12),
+      for (final r in RatingKecepatan.values)
+        _Baris('• ${labelRating(e, r)}', '${l.perRating[r] ?? 0}', indent: 12),
+      _Baris('Combo terjual', '${l.comboTerjual}'),
+      _Baris(
+        'Barang terlaris',
+        l.itemTerlarisId == null
+            ? '-'
+            : '${labelItem(e.toko(l.tokoId), l.itemTerlarisId!)} '
+                  '(${l.jumlahTerlaris})',
+      ),
+      _Baris('Pesanan sebagian', '${l.pesananSebagian}'),
+      _Baris('Pesanan ditolak', '${l.pesananDitolak}'),
+      _Baris('Pelanggan hilang', '${l.totalHilang}'),
+      for (final a in AlasanPergi.values)
+        _Baris('• ${a.label}', '${l.hilang[a] ?? 0}', indent: 12),
+      _Baris('Perubahan reputasi', formatDelta(l.perubahanReputasi)),
+      _Baris('Status segel', l.statusSegel.label),
+      _Baris('Alert dikirim', '${l.alertDikirim}'),
+    ];
+  }
+}
+
+class _Baris extends StatelessWidget {
+  const _Baris(
+    this.label,
+    this.nilai, {
+    this.tebal = false,
+    this.warna,
+    this.indent = 0,
+  });
+
+  final String label;
+  final String nilai;
+  final bool tebal;
+  final Color? warna;
+  final double indent;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontWeight: tebal ? FontWeight.bold : null,
+      color: warna,
+    );
+    return Padding(
+      padding: EdgeInsets.fromLTRB(indent, 2, 0, 2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(nilai, style: style, textAlign: TextAlign.end),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -109,9 +212,8 @@ Future<void> tampilkanDialogLaporan(BuildContext context) {
       builder: (context, ref, _) {
         final v = ref.watch(simControllerProvider);
         final e = v.engine;
-        final t = v.toko;
         final l = e.laporanTerakhir;
-        final denda = e.dendaTebusSegel(t.id);
+        final ctrl = ref.read(simControllerProvider.notifier);
         return AlertDialog(
           title: Text('Laporan Hari ke-${l?.hari ?? e.hari}'),
           content: SizedBox(
@@ -119,20 +221,24 @@ Future<void> tampilkanDialogLaporan(BuildContext context) {
             child: SingleChildScrollView(
               child: l == null
                   ? const SizedBox.shrink()
-                  : LaporanView(laporan: l, engine: e),
+                  : LaporanView(laporan: l, engine: e, tokoAwal: v.toko.id),
             ),
           ),
           actions: [
-            if (t.segelAktif && !t.disegelPenuhHariIni)
-              OutlinedButton(
-                onPressed: e.uang >= denda
-                    ? ref.read(simControllerProvider.notifier).tebusSegel
-                    : null,
-                child: Text('Tebus segel (${formatRupiah(denda)})'),
-              ),
+            for (final t in e.tokos)
+              if (t.segelAktif && !t.disegelPenuhHariIni)
+                OutlinedButton(
+                  onPressed: e.uang >= e.dendaTebusSegel(t.id)
+                      ? () => ctrl.tebusSegelToko(t.id)
+                      : null,
+                  child: Text(
+                    'Tebus segel ${e.tokos.length > 1 ? '${t.nama} ' : ''}'
+                    '(${formatRupiah(e.dendaTebusSegel(t.id))})',
+                  ),
+                ),
             FilledButton(
               onPressed: () {
-                ref.read(simControllerProvider.notifier).mulaiHariBaru();
+                ctrl.mulaiHariBaru();
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Hari Berikutnya'),

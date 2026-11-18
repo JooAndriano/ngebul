@@ -49,7 +49,9 @@ class OrmasConfig {
     required this.namaSingkat,
     required this.emoji,
     required this.hariMulai,
-    required this.peluangPerHari,
+    required this.peluangPerHariUtama,
+    required this.peluangPerHariCabang,
+    required this.tundaJikaAdaOrmasLain,
     required this.jamMunculMin,
     required this.jamMunculMaks,
     required this.persenJatah,
@@ -76,7 +78,14 @@ class OrmasConfig {
   final String emoji;
 
   final int hariMulai;
-  final double peluangPerHari;
+
+  /// Peluang muncul per toko per hari (maks 1 kunjungan per toko per hari).
+  final double peluangPerHariUtama;
+  final double peluangPerHariCabang;
+
+  /// Maks 1 ormas aktif di seluruh toko; jika jadwal tiba saat ada ormas
+  /// lain, kunjungan ditunda sekian detik.
+  final double tundaJikaAdaOrmasLain;
   final double jamMunculMin;
   final double jamMunculMaks;
 
@@ -221,10 +230,13 @@ class SimConfig {
     required this.reputasiAntreanPenuh,
     required this.reputasiAntreLama,
     required this.durasiTampilPergi,
-    required this.kasirDurasiDasar,
-    required this.kasirDurasiPerUnit,
-    required this.kasirReputasi,
-    required this.biayaSewaHarian,
+    required this.kasir,
+    required this.cabang,
+    required this.sewaHarianUtama,
+    required this.sewaHarianCabang,
+    required this.durasiUcapan,
+    required this.ambangUcapanSabar1,
+    required this.ambangUcapanSabar2,
     required this.ambangLaris,
     required this.ambangNormal,
     required this.langkahSimulasiMaks,
@@ -307,15 +319,21 @@ class SimConfig {
   /// Lama pelanggan menampilkan 🚫 sebelum pergi.
   final double durasiTampilPergi;
 
-  // Kasir otomatis (debug, calon fitur pekerja)
-  /// Durasi proses = dasar + perUnit x total unit.
-  final double kasirDurasiDasar;
-  final double kasirDurasiPerUnit;
-  final double kasirReputasi;
+  final KasirConfig kasir;
+  final CabangConfig cabang;
 
-  // Ekonomi harian
-  /// Sewa lapak per toko per hari.
-  final double biayaSewaHarian;
+  // Ekonomi harian (dipotong akhir hari per toko)
+  final double sewaHarianUtama;
+  final double sewaHarianCabang;
+
+  /// Lama gelembung ucapan tampil (detik).
+  final double durasiUcapan;
+
+  /// Ucapan "Mana nih?" saat sisa kesabaran < ini (sekali per pelanggan).
+  final double ambangUcapanSabar1;
+
+  /// Ucapan "Woy, cepetan!" saat sisa kesabaran < ini.
+  final double ambangUcapanSabar2;
 
   // Status etalase (peluang beli rata-rata)
   final double ambangLaris;
@@ -338,4 +356,41 @@ class SimConfig {
 
   TipePelangganData tipeById(String id) =>
       tipePelanggan.firstWhere((t) => t.id == id);
+}
+
+/// Kasir (pekerja) per toko. Indeks list = level - 1.
+class KasirConfig {
+  const KasirConfig({
+    required this.biayaPerLevel,
+    required this.gajiHarianPerLevel,
+    required this.faktorDurasiPerLevel,
+    required this.durasiDasar,
+    required this.durasiPerUnit,
+    required this.reputasi,
+  });
+
+  /// Biaya rekrut (level 1) dan naik level (2, 3).
+  final List<double> biayaPerLevel;
+
+  /// Dibayar akhir hari, juga saat toko disegel.
+  final List<double> gajiHarianPerLevel;
+
+  /// Durasi proses = (dasar + perUnit x total unit) x faktor level.
+  final List<double> faktorDurasiPerLevel;
+  final double durasiDasar;
+  final double durasiPerUnit;
+
+  /// Reputasi per pelanggan yang dilayani kasir (tanpa tip).
+  final double reputasi;
+
+  int get levelMaks => biayaPerLevel.length;
+}
+
+/// Buka cabang. Indeks list = cabang ke-(i+1).
+class CabangConfig {
+  const CabangConfig({required this.maksToko, required this.biaya});
+
+  /// Termasuk toko utama.
+  final int maksToko;
+  final List<double> biaya;
 }

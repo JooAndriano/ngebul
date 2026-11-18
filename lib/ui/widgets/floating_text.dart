@@ -7,11 +7,15 @@ class FloatingText extends StatefulWidget {
     required this.teks,
     required this.onSelesai,
     this.warna,
+    this.gaya,
   });
 
   final String teks;
   final VoidCallback onSelesai;
   final Color? warna;
+
+  /// Gaya teks khusus (mis. efek komik); menimpa [warna].
+  final TextStyle? gaya;
 
   @override
   State<FloatingText> createState() => _FloatingTextState();
@@ -34,10 +38,12 @@ class _FloatingTextState extends State<FloatingText>
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.bold,
-      color: widget.warna ?? Theme.of(context).colorScheme.primary,
-    );
+    final style =
+        widget.gaya ??
+        Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: widget.warna ?? Theme.of(context).colorScheme.primary,
+        );
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) => Transform.translate(

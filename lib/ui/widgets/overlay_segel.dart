@@ -18,36 +18,39 @@ class OverlaySegel extends ConsumerWidget {
     return ColoredBox(
       color: Colors.black.withValues(alpha: 0.55),
       child: Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${TampilanData.emojiSegel} DISEGEL',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.error,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(8),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${TampilanData.emojiSegel} DISEGEL',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Warung disegel ${e.config.ormas.namaSingkat} hari ini.\n'
-                  'Tidak ada pelanggan. Waktu berjalan '
-                  'x${e.config.ormas.pengaliWaktuSaatDisegel.toStringAsFixed(0)}.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: e.uang >= denda
-                      ? () => ref
-                            .read(simControllerProvider.notifier)
-                            .tebusSegel()
-                      : null,
-                  child: Text('Tebus segel (${formatRupiah(denda)})'),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${v.toko.nama} disegel ${e.config.ormas.namaSingkat} '
+                    'hari ini.\nTidak ada pelanggan di toko ini. '
+                    '${e.pengaliWaktu > 1 ? 'Semua toko disegel: waktu berjalan x${e.pengaliWaktu.toStringAsFixed(0)}.' : 'Toko lain tetap buka.'}',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: e.uang >= denda
+                        ? () => ref
+                              .read(simControllerProvider.notifier)
+                              .tebusSegel()
+                        : null,
+                    child: Text('Tebus segel (${formatRupiah(denda)})'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

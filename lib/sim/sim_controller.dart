@@ -148,7 +148,35 @@ class SimController extends Notifier<SimView> {
     _perbarui(indeksToko: 0, tutupPanel: true);
   }
 
+  /// Ganti toko yang difokuskan (hanya toko fokus yang bisa diketuk;
+  /// toko lain tetap disimulasikan).
   void pilihToko(int indeks) => _perbarui(indeksToko: indeks);
+
+  void fokusKeToko(String tokoId) {
+    final i = _e.tokos.indexWhere((t) => t.id == tokoId);
+    if (i >= 0) _perbarui(indeksToko: i);
+  }
+
+  /// Ketuk alert: fokus ke tokonya dan kembalikan panel yang relevan
+  /// (Kelola untuk stok, Warung untuk segel; ormas cukup banner di layar).
+  JenisPanel? bukaAlert(AlertEvent a) {
+    fokusKeToko(a.tokoId);
+    return switch (a.jenis) {
+      JenisAlert.stokHabis || JenisAlert.stokMenipis => JenisPanel.kelola,
+      JenisAlert.segel => JenisPanel.warung,
+      _ => null,
+    };
+  }
+
+  // Usaha (cabang & kasir)
+  /// Buka cabang lalu fokus ke cabang baru. Null jika gagal.
+  Toko? bukaCabang(JenisUsaha jenis, Sisi sisi) {
+    final t = _e.bukaCabang(jenis, sisi);
+    _perbarui(indeksToko: t == null ? null : _e.tokos.length - 1);
+    return t;
+  }
+
+  bool rekrutKasir() => _aksi(() => _e.rekrutKasir(_tokoId));
 
   // Panel samping
   void bukaPanel(JenisPanel panel) => _perbarui(panel: panel);
@@ -197,6 +225,7 @@ class SimController extends Notifier<SimView> {
   HasilOrmas tawarOrmas() => _aksi(() => _e.tawarOrmas(_tokoId));
   HasilOrmas panggilPakRt() => _aksi(() => _e.panggilPakRt(_tokoId));
   bool tebusSegel() => _aksi(() => _e.tebusSegel(_tokoId));
+  bool tebusSegelToko(String tokoId) => _aksi(() => _e.tebusSegel(tokoId));
 
   // Pesan
   void bacaPesan(int id) => _aksi(() => _e.bacaPesan(id));
@@ -213,6 +242,7 @@ class SimController extends Notifier<SimView> {
   void debugTambahUang(double jumlah) =>
       _aksi(() => _e.debugTambahUang(jumlah));
   bool munculkanOrmas() => _aksi(() => _e.munculkanOrmas(_tokoId));
+  void kirimAlertUji() => _aksi(() => _e.kirimAlertUji(_tokoId));
   void kirimPesanKeluarga() => _aksi(_e.kirimPesanKeluarga);
   void kirimInfoHargaPokok() => _aksi(_e.kirimInfoHargaPokok);
 

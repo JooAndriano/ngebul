@@ -30,7 +30,11 @@ class StatistikHarian {
   double jatahOrmas = 0;
   double denda = 0;
   int dilayani = 0;
+  int dilayaniKasir = 0;
   int comboTerjual = 0;
+  int alertDikirim = 0;
+  double sewa = 0;
+  double gajiKasir = 0;
   int sebagian = 0;
   int ditolak = 0;
   final Map<RatingKecepatan, int> perRating = {};
@@ -48,6 +52,8 @@ class Toko {
     required this.nama,
     required this.katalog,
     required this.reputasi,
+    required this.utama,
+    required this.slot,
   }) : kategoriTerbuka = {
          for (final k in katalog.kategori)
            if (!k.terkunciAwal) k.id,
@@ -62,6 +68,12 @@ class Toko {
 
   final String id;
   String nama;
+
+  /// Toko pertama (bukan cabang).
+  final bool utama;
+
+  /// Posisi di jalan (dipakai tata letak Stage 2).
+  final SlotJalan slot;
   final KatalogData katalog;
   JenisUsaha get jenisUsaha => katalog.jenis;
 
@@ -85,11 +97,14 @@ class Toko {
   };
   final Map<Sisi, int> ekspansi = {Sisi.kiri: 0, Sisi.kanan: 0};
 
-  /// Calon fitur pekerja (belum dipakai).
+  /// 0 = belum punya kasir; 1-3 = level kasir.
   int kasirLevel = 0;
 
-  /// Debug: kasir otomatis aktif.
+  /// Debug: kasir bekerja walau belum direkrut (kecepatan level 1).
   bool kasirOtomatis = false;
+
+  /// Kasir sedang bekerja di toko ini.
+  bool get punyaKasir => kasirLevel > 0 || kasirOtomatis;
   ProsesKasir? prosesKasir;
   SesiLayani? sesiLayani;
 
@@ -99,6 +114,9 @@ class Toko {
   // Ormas & segel.
   KunjunganOrmas? ormas;
   double? jadwalOrmas;
+
+  /// Ormas sudah datang hari ini (maks 1 kunjungan terjadwal per hari).
+  bool ormasDatangHariIni = false;
   double jatahTerakhir = 0;
   bool segelAktif = false;
   bool disegelPenuhHariIni = false;
@@ -114,10 +132,6 @@ class Toko {
   StatistikHarian stat = StatistikHarian();
   double reputasiAwalHari = 0;
   LaporanToko? laporanTerakhir;
-
-  /// Item yang alert-nya sudah dikirim (direset saat stok diisi).
-  final Set<String> alertHabisTerkirim = {};
-  final Set<String> alertMenipisTerkirim = {};
 
   bool kategoriTersedia(String kategoriId) =>
       kategoriTerbuka.contains(kategoriId);
@@ -137,6 +151,11 @@ class Toko {
 
   /// Toko melayani pelanggan saat ini.
   bool get buka => !tutupHariIni && !disegelPenuhHariIni;
+
+  /// Toko sedang tertutup segel (kena hari ini, disegel penuh, atau besok).
+  bool get kondisiSegel => segelAktif || tutupHariIni || disegelPenuhHariIni;
+
+  int get jumlahAntre => antrean.values.fold(0, (a, b) => a + b.length);
 
   int stokItem(String itemId) => stok[itemId] ?? 0;
 }

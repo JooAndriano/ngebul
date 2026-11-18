@@ -239,12 +239,13 @@ void main() {
     });
   });
 
-  group('per toko (siap multi-toko)', () {
+  group('per toko (multi-toko)', () {
     test('uang & waktu global; antrean, reputasi, laporan per toko', () {
       final e = buatEngine();
-      final t2 = e.tambahToko(JenisUsaha.sembako);
+      e.debugTambahUang(2000000);
+      final t2 = e.bukaCabang(JenisUsaha.sembako, Sisi.kiri)!;
       expect(t2.id, 'toko2');
-      expect(e.uang, 200000); // tambah toko tidak mengubah uang
+      expect(e.uang, 200000); // biaya cabang 1 = 2.000.000
       expect(t2.stokItem('beras'), 5);
 
       datang(e, pesananItem({'es_teh': 1}));
@@ -262,12 +263,13 @@ void main() {
       expect(l.toko.map((x) => x.tokoId), [toko1, 'toko2']);
       expect(l.toko[0].pendapatan, 0);
       expect(l.toko[1].pendapatan, 15000);
-      expect(e.uang, 200000 + 15000 + 2250 - 2 * 20000); // sewa per toko
+      expect(e.uang, 200000 + 15000 + 2250 - 20000 - 30000); // sewa per toko
     });
 
     test('segel satu toko tidak menutup toko lain; hari lanjut', () {
       final e = buatEngine();
-      e.tambahToko(JenisUsaha.sembako);
+      e.debugTambahUang(2000000);
+      e.bukaCabang(JenisUsaha.sembako, Sisi.kanan);
       e.munculkanOrmas(toko1);
       e.tick(61);
       expect(e.toko(toko1).tutupHariIni, isTrue);

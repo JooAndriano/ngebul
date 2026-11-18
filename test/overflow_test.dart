@@ -199,7 +199,51 @@ Future<void> _jalankan(
   await cek('hari disegel penuh');
 
   await bukaPanel('Warung');
+  // Buka cabang lewat dialog.
+  await tester.tap(find.textContaining('Buka Cabang ('));
+  await cek('dialog buka cabang');
+  await tester.tap(find.text('Buka'));
+  await cek('cabang 1 dibuka');
   await tutupPanel();
+
+  // Multi-toko ramai: 3 toko, kasir, alert, ormas, ucapan di toko fokus.
+  e.bukaCabang(JenisUsaha.makanan, Sisi.kanan);
+  for (final x in e.tokos) {
+    e.rekrutKasir(x.id);
+  }
+  ctrl.pilihToko(1);
+  final c1 = e.tokos[1];
+  final itemC1 = c1.katalog.item.first.id;
+  for (var n = 0; n < 12; n++) {
+    datang(e, pesananItem({itemC1: 1}), tokoId: c1.id, tipeId: 'turis');
+  }
+  e.toko(c1.id).stok[itemC1] = 0;
+  e.tick(0.3); // kasir membatalkan: alert stok habis + ucapan
+  e.kirimAlertUji(e.tokos[2].id);
+  e.munculkanOrmas(c1.id);
+  e.tick(50); // marah80
+  ctrl.setJeda(false);
+  await cek('multi-toko + kasir + alert');
+
+  await bukaPanel('Warung');
+  await tutupPanel();
+  await tester.tap(find.byTooltip('Alert'));
+  await cek('daftar alert');
+  await tester.tap(find.text('Tutup'));
+  await cek('daftar alert ditutup');
+
+  // Laporan multi-toko: ringkasan + tab per toko.
+  ctrl.debugLewatiKeAkhirHari();
+  await cek('laporan multi-toko');
+  final dialog = find.byType(AlertDialog);
+  for (final x in e.tokos) {
+    await tester.tap(
+      find.descendant(of: dialog, matching: find.text(x.nama)).first,
+    );
+    await cek('laporan tab ${x.nama}');
+  }
+  await tester.tap(find.text('Hari Berikutnya'));
+  await cek('hari berikutnya multi-toko');
 
   ctrl.ulangPilihUsaha();
   await cek('kembali ke pilih usaha');

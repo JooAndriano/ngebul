@@ -7,6 +7,7 @@ import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import 'gelembung_komik.dart';
 import 'ui_helper.dart';
 
 /// Scene placeholder tampak depan: antrean kiri | warung | antrean kanan.
@@ -20,6 +21,25 @@ class SceneWarung extends ConsumerWidget {
     final e = v.engine;
     final t = v.toko;
     final theme = Theme.of(context);
+    // Ucapan toko non-fokus tidak ditampilkan.
+    final ucapan = [
+      for (final u in e.ucapanAktif)
+        if (u.tokoId == t.id) u,
+    ];
+    final diAntre = {
+      for (final a in t.antrean.values)
+        for (final p in a) p.id,
+    };
+    final ucapanPelanggan = {
+      for (final u in ucapan)
+        if (u.sumber == SumberUcapan.pelanggan) u.pelangganId!: u.teks,
+    };
+    final ucapanLewat = [
+      for (final u in ucapan)
+        if (u.sumber == SumberUcapan.pelanggan &&
+            !diAntre.contains(u.pelangganId))
+          u,
+    ];
     void layani(Sisi sisi) =>
         ref.read(simControllerProvider.notifier).bukaLayani(sisi);
 
@@ -40,26 +60,44 @@ class SceneWarung extends ConsumerWidget {
           children: [
             _BarisKejadian(engine: e, toko: t),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Stack(
                 children: [
-                  Expanded(
-                    child: _BarisAntrean(
-                      engine: e,
-                      toko: t,
-                      sisi: Sisi.kiri,
-                      onKetuk: () => layani(Sisi.kiri),
+                  Positioned.fill(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _BarisAntrean(
+                            engine: e,
+                            toko: t,
+                            sisi: Sisi.kiri,
+                            ucapan: ucapanPelanggan,
+                            onKetuk: () => layani(Sisi.kiri),
+                          ),
+                        ),
+                        _BlokWarung(engine: e, toko: t, ucapan: ucapan),
+                        Expanded(
+                          child: _BarisAntrean(
+                            engine: e,
+                            toko: t,
+                            sisi: Sisi.kanan,
+                            ucapan: ucapanPelanggan,
+                            onKetuk: () => layani(Sisi.kanan),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  _BlokWarung(engine: e, toko: t),
-                  Expanded(
-                    child: _BarisAntrean(
-                      engine: e,
-                      toko: t,
-                      sisi: Sisi.kanan,
-                      onKetuk: () => layani(Sisi.kanan),
+                  // Ucapan pelanggan yang sudah/tidak sempat antre.
+                  if (ucapanLewat.isNotEmpty)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: _UcapanLewat(engine: e, ucapan: ucapanLewat),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -98,11 +136,27 @@ class _BarisKejadian extends StatelessWidget {
   }
 }
 
-/// Warung di tengah; melebar sesuai level ekspansi kiri/kanan.
+/// Warung di tengah; melebar sesuai level ekspansi kiri/kanan. Ormas,
+/// Pak RT, dan kasir tampil di sini beserta gelembung ucapannya.
 class _BlokWarung extends StatelessWidget {
-  const _BlokWarung({required this.engine, required this.toko});
+  const _BlokWarung({
+    required this.engine,
+    required this.toko,
+    required this.ucapan,
+  });
   final SimulationEngine engine;
   final Toko toko;
+
+  /// Ucapan aktif di toko ini.
+  final List<UcapanEvent> ucapan;
+
+  String? _teks(SumberUcapan s) {
+    String? hasil;
+    for (final u in ucapan) {
+      if (u.sumber == s) hasil = u.teks;
+    }
+    return hasil;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,10 +188,31 @@ class _BlokWarung extends StatelessWidget {
   }
 
   Widget _isiBlok(Widget Function() potongan) {
+    final teksOrmas = _teks(SumberUcapan.ormas);
+    final teksRt = _teks(SumberUcapan.pakRT);
+    final teksKasir = _teks(SumberUcapan.kasir);
+    final adaOrmas = toko.ormas != null || teksOrmas != null || teksRt != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (toko.ormas != null) _FigurOrmas(engine: engine, toko: toko),
+        if (adaOrmas)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _FigurOrmas(engine: engine, toko: toko, ucapan: teksOrmas),
+              if (teksRt != null) ...[
+                const SizedBox(width: 8),
+                DenganGelembung(
+                  teks: teksRt,
+                  child: const Text(
+                    TampilanData.emojiPakRt,
+                    style: TextStyle(fontSize: 30),
+                  ),
+                ),
+              ],
+            ],
+          ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -147,6 +222,25 @@ class _BlokWarung extends StatelessWidget {
               TampilanData.emojiWarung,
               style: TextStyle(fontSize: 64),
             ),
+            if (toko.punyaKasir)
+              DenganGelembung(
+                teks: teksKasir,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      TampilanData.emojiFigurKasir,
+                      style: TextStyle(fontSize: 26),
+                    ),
+                    Text(
+                      toko.kasirLevel > 0
+                          ? 'Kasir Lv${toko.kasirLevel}'
+                          : 'Kasir',
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
             for (var i = 0; i < toko.ekspansi[Sisi.kanan]!; i++) potongan(),
           ],
         ),
@@ -156,14 +250,27 @@ class _BlokWarung extends StatelessWidget {
 }
 
 class _FigurOrmas extends StatelessWidget {
-  const _FigurOrmas({required this.engine, required this.toko});
+  const _FigurOrmas({
+    required this.engine,
+    required this.toko,
+    required this.ucapan,
+  });
   final SimulationEngine engine;
   final Toko toko;
+  final String? ucapan;
 
   @override
   Widget build(BuildContext context) {
-    final o = toko.ormas!;
+    final o = toko.ormas;
     final c = engine.config.ormas;
+    final figur = DenganGelembung(
+      teks: ucapan,
+      child: Text(c.emoji, style: const TextStyle(fontSize: 30)),
+    );
+    // Ormas sudah pergi, ucapan terakhirnya masih tampil.
+    if (o == null) {
+      return Padding(padding: const EdgeInsets.only(bottom: 4), child: figur);
+    }
     final scheme = Theme.of(context).colorScheme;
     final tingkat = engine.tingkatPeringatanOrmas(toko.id);
     final warna = tingkat >= 2
@@ -176,7 +283,7 @@ class _FigurOrmas extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(c.emoji, style: const TextStyle(fontSize: 30)),
+          figur,
           const SizedBox(width: 4),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,6 +307,61 @@ class _FigurOrmas extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Ucapan pelanggan yang tidak lagi (atau tidak sempat) antre: tampil di
+/// atas sisi antreannya (atau di tengah jika tidak sempat antre).
+class _UcapanLewat extends StatelessWidget {
+  const _UcapanLewat({required this.engine, required this.ucapan});
+  final SimulationEngine engine;
+  final List<UcapanEvent> ucapan;
+
+  @override
+  Widget build(BuildContext context) {
+    UcapanEvent? terakhir(Sisi? sisi) {
+      UcapanEvent? hasil;
+      for (final u in ucapan) {
+        if (u.sisi == sisi) hasil = u;
+      }
+      return hasil;
+    }
+
+    Widget kolom(Sisi? sisi, Alignment align) {
+      final u = terakhir(sisi);
+      final emoji = u?.tipeId == null
+          ? ''
+          : engine.config.tipePelanggan
+                    .where((t) => t.id == u!.tipeId)
+                    .firstOrNull
+                    ?.emoji ??
+                '';
+      return Expanded(
+        child: Align(
+          alignment: align,
+          child: u == null
+              ? const SizedBox.shrink()
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 18)),
+                      GelembungKomik(teks: u.teks),
+                    ],
+                  ),
+                ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        kolom(Sisi.kiri, Alignment.centerRight),
+        kolom(null, Alignment.center),
+        kolom(Sisi.kanan, Alignment.centerLeft),
+      ],
     );
   }
 }
@@ -230,12 +392,16 @@ class _BarisAntrean extends StatelessWidget {
     required this.engine,
     required this.toko,
     required this.sisi,
+    required this.ucapan,
     required this.onKetuk,
   });
 
   final SimulationEngine engine;
   final Toko toko;
   final Sisi sisi;
+
+  /// pelangganId -> teks ucapan aktif.
+  final Map<int, String> ucapan;
   final VoidCallback onKetuk;
 
   @override
@@ -252,6 +418,7 @@ class _BarisAntrean extends StatelessWidget {
                     key: ValueKey(antre[i].id),
                     pelanggan: antre[i],
                     terdepan: i == 0,
+                    ucapan: ucapan[antre[i].id],
                     onKetuk: onKetuk,
                   )
                 : const _SlotKosong(),
@@ -292,11 +459,13 @@ class _FigurPelanggan extends StatelessWidget {
     super.key,
     required this.pelanggan,
     required this.terdepan,
+    required this.ucapan,
     required this.onKetuk,
   });
 
   final Pelanggan pelanggan;
   final bool terdepan;
+  final String? ucapan;
   final VoidCallback onKetuk;
 
   @override
@@ -312,7 +481,8 @@ class _FigurPelanggan extends StatelessWidget {
     final balon = switch (p.status) {
       StatusPelanggan.menunggu => TampilanData.emojiBalonTanya,
       StatusPelanggan.dilayani => TampilanData.emojiDilayani,
-      StatusPelanggan.diprosesKasir => TampilanData.emojiKasir,
+      StatusPelanggan.diprosesKasir =>
+        '${TampilanData.emojiKasir} dilayani kasir',
       StatusPelanggan.pergiStokHabis => TampilanData.emojiStokHabis,
     };
     final bisaDiketuk = terdepan && p.status == StatusPelanggan.menunggu;
@@ -347,10 +517,13 @@ class _FigurPelanggan extends StatelessWidget {
 
     return Align(
       alignment: Alignment.bottomCenter,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: bisaDiketuk ? onKetuk : null,
-        child: FittedBox(fit: BoxFit.scaleDown, child: isi),
+      child: DenganGelembung(
+        teks: ucapan,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: bisaDiketuk ? onKetuk : null,
+          child: FittedBox(fit: BoxFit.scaleDown, child: isi),
+        ),
       ),
     );
   }

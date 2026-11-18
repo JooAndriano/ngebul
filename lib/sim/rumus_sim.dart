@@ -159,8 +159,14 @@ abstract final class RumusSim {
       c.rating.firstWhere((x) => x.rating == r);
 
   /// Durasi kasir otomatis = 1.5 + 1.2 x total unit.
-  static double durasiKasir(SimConfig c, int totalUnit) =>
-      c.kasirDurasiDasar + c.kasirDurasiPerUnit * totalUnit;
+  /// Durasi proses kasir = (1,5 + 1,2 x unit) x faktor level. Level 0
+  /// (kasir debug) memakai faktor level 1.
+  static double durasiKasir(SimConfig c, int totalUnit, {int level = 1}) {
+    final k = c.kasir;
+    final i = (level - 1).clamp(0, k.faktorDurasiPerLevel.length - 1);
+    return (k.durasiDasar + k.durasiPerUnit * totalUnit) *
+        k.faktorDurasiPerLevel[i];
+  }
 
   // ------------------------------------------------------------ Ekspansi
 

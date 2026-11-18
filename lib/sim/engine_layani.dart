@@ -79,6 +79,8 @@ extension LayaniEngine on SimulationEngine {
     final butuh = s.pelanggan.pesanan.kebutuhan[itemId] ?? 0;
     if (s.diTas(itemId) >= butuh) {
       s.pelanggan.sisaKesabaran -= config.penaltiSalahAmbil;
+      _ucapPelanggan(t, s.pelanggan, SituasiUcapan.salahAmbil, sisi: s.sisi);
+      _efekKomik(t, JenisEfek.brak);
       return HasilAmbil.salahAmbil;
     }
     s.tas[itemId] = s.diTas(itemId) + 1;
@@ -121,10 +123,11 @@ extension LayaniEngine on SimulationEngine {
     t.sesiLayani = null;
     t.stat.ditolak++;
     _pergi(t, s.pelanggan.tipe, AlasanPergi.stokHabis, config.reputasiTolak);
+    _ucapPelanggan(t, s.pelanggan, SituasiUcapan.tolakStok, sisi: s.sisi);
     return true;
   }
 
-  /// Debug (calon fitur pekerja).
+  /// Debug: kasir bekerja walau belum direkrut (untuk mengetes).
   void setKasirOtomatis(String tokoId, bool aktif) {
     final t = toko(tokoId);
     t.kasirOtomatis = aktif;
@@ -159,6 +162,12 @@ extension LayaniEngine on SimulationEngine {
       t,
       Kejadian(tipe: p.tipe, pendapatan: total + tip, rating: r.rating),
     );
+    _ucapPelanggan(
+      t,
+      p,
+      sebagian ? SituasiUcapan.sebagian : _situasiTerimaKasih(r.rating),
+      sisi: s.sisi,
+    );
     return HasilLayani(
       pelanggan: p,
       rating: r.rating,
@@ -168,15 +177,22 @@ extension LayaniEngine on SimulationEngine {
     );
   }
 
+  SituasiUcapan _situasiTerimaKasih(RatingKecepatan r) => switch (r) {
+    RatingKecepatan.kilat => SituasiUcapan.terimaKasihKilat,
+    RatingKecepatan.lancar => SituasiUcapan.terimaKasih,
+    RatingKecepatan.mepet => SituasiUcapan.terimaKasihMepet,
+  };
+
   /// Catat penjualan [baris]: uang, HPP, stok, statistik. Stok baru
   /// berkurang di sini (bukan saat mengambil). Mengembalikan total harga.
   double _jual(Toko t, List<BarisPesanan> baris) {
     var total = 0.0;
-    final item = <String>{};
+    final sebelum = <String, int>{};
     for (final b in baris) {
       total += RumusSim.hargaBaris(t, b);
       if (b.isCombo) t.stat.comboTerjual += b.qty;
       for (final e in b.kebutuhan.entries) {
+        sebelum.putIfAbsent(e.key, () => t.stokItem(e.key));
         t.stok[e.key] = t.stokItem(e.key) - e.value;
         t.stat.hpp += t.modal[e.key]! * e.value;
         t.stat.terjual.update(
@@ -184,13 +200,13 @@ extension LayaniEngine on SimulationEngine {
           (n) => n + e.value,
           ifAbsent: () => e.value,
         );
-        item.add(e.key);
       }
     }
     _s.uang += total;
     t.stat.pendapatan += total;
     t.stat.dilayani++;
-    _cekAlertStok(t, item);
+    _efekKomik(t, JenisEfek.kling);
+    _cekAlertStok(t, sebelum);
     return total;
   }
 
@@ -200,6 +216,9 @@ extension LayaniEngine on SimulationEngine {
       if (t.stokItem(e.key) < e.value) e.key,
   ];
 
+  /// Kasir memproses 1 pelanggan sekaligus: pelanggan terdepan dengan
+  /// kesabaran paling sedikit di antara dua sisi, kecuali yang sedang
+  /// dibuka pemain di panel Layani.
   void _langkahKasir(Toko t, double dt) {
     final pr = t.prosesKasir;
     if (pr != null) {
@@ -211,7 +230,6 @@ extension LayaniEngine on SimulationEngine {
       return;
     }
 
-    // Pelanggan terdepan yang menunggu & paling tidak sabar.
     Pelanggan? pilih;
     for (final antre in t.antrean.values) {
       if (antre.isEmpty) continue;
@@ -228,42 +246,44 @@ extension LayaniEngine on SimulationEngine {
     pilih.status = StatusPelanggan.diprosesKasir;
     t.prosesKasir = ProsesKasir(
       pelanggan: pilih,
-      sisaDetik: RumusSim.durasiKasir(config, pilih.pesanan.totalUnit),
+      sisaDetik: RumusSim.durasiKasir(
+        config,
+        pilih.pesanan.totalUnit,
+        level: t.kasirLevel,
+      ),
     );
   }
 
+  /// Seperti serve biasa, tanpa tip, reputasi +0,2. Rating kecepatan tetap
+  /// dihitung untuk ucapan.
   void _selesaikanKasir(Toko t, Pelanggan p) {
-    final antre = t.antrean.values.firstWhere(
-      (a) => a.contains(p),
-      orElse: () => const [],
-    );
-    if (antre.isEmpty) return;
+    final sisi = _sisiPelanggan(t, p);
+    if (sisi == null) return;
     if (_itemKurang(t, p).isNotEmpty) {
       _batalkanKasir(t, p);
       return;
     }
-    antre.remove(p);
+    t.antrean[sisi]!.remove(p);
+    final r = RumusSim.rating(config, p.fraksiKesabaran);
     final total = _jual(t, p.pesanan.baris);
-    _ubahReputasi(t, config.kasirReputasi);
-    _catat(t, Kejadian(tipe: p.tipe, pendapatan: total));
+    t.stat.dilayaniKasir++;
+    _ubahReputasi(t, config.kasir.reputasi);
+    _catat(t, Kejadian(tipe: p.tipe, pendapatan: total, olehKasir: true));
+    _ucapPelanggan(t, p, _situasiTerimaKasih(r.rating), sisi: sisi);
   }
 
-  /// Pesanan dibatalkan kasir karena stok kurang: 🚫 lalu pergi.
+  /// Pesanan dibatalkan kasir karena stok kurang: 🚫 lalu pergi
+  /// (stok habis, reputasi -0,3). Alert stok habis untuk item yang stoknya 0
+  /// (dedup: sekali per item sampai stok > 0 lagi).
   void _batalkanKasir(Toko t, Pelanggan p) {
     final kurang = _itemKurang(t, p);
     p.status = StatusPelanggan.pergiStokHabis;
     p.sisaTampil = config.durasiTampilPergi;
     t.stat.ditolak++;
     _pergi(t, p.tipe, AlasanPergi.stokHabis, config.reputasiTolak);
-    _cekAlertStokHabis(t, kurang);
-  }
-
-  /// Alert stok habis untuk item yang stoknya 0 (sekali per item).
-  void _cekAlertStokHabis(Toko t, List<String> itemIds) {
-    for (final id in itemIds) {
-      if (t.stokItem(id) <= 0 && t.alertHabisTerkirim.add(id)) {
-        _alert(JenisAlert.stokHabis, t, itemId: id);
-      }
+    _ucapPelanggan(t, p, SituasiUcapan.tolakStok);
+    for (final id in kurang) {
+      if (t.stokItem(id) <= 0) _alert(JenisAlert.stokHabis, t, itemId: id);
     }
   }
 }

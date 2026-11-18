@@ -126,7 +126,7 @@ extension TokoEngine on SimulationEngine {
     if (biaya > _s.uang) return HasilIsiStok.uangKurang;
     _s.uang -= biaya;
     t.stok[itemId] = t.stokItem(itemId) + n;
-    _resetAlertStok(t, itemId);
+    _sinkronAlert();
     return HasilIsiStok.berhasil;
   }
 
@@ -179,32 +179,4 @@ extension TokoEngine on SimulationEngine {
   }
 
   void debugTambahUang(double jumlah) => _s.uang += jumlah;
-
-  // ------------------------------------------------------------ Alert
-
-  /// Kirim alert stok habis / menipis sekali per item sampai diisi lagi.
-  void _cekAlertStok(Toko t, Iterable<String> itemIds) {
-    for (final id in itemIds) {
-      final s = t.stokItem(id);
-      final kap = t.katalog.itemById(id).kapasitas;
-      if (s <= 0) {
-        if (t.alertHabisTerkirim.add(id)) {
-          _alert(JenisAlert.stokHabis, t, itemId: id);
-        }
-      } else if (s <= config.ambangAlertStokMenipis * kap) {
-        if (t.alertMenipisTerkirim.add(id)) {
-          _alert(JenisAlert.stokMenipis, t, itemId: id);
-        }
-      }
-    }
-  }
-
-  void _resetAlertStok(Toko t, String itemId) {
-    final s = t.stokItem(itemId);
-    final kap = t.katalog.itemById(itemId).kapasitas;
-    if (s > 0) t.alertHabisTerkirim.remove(itemId);
-    if (s > config.ambangAlertStokMenipis * kap) {
-      t.alertMenipisTerkirim.remove(itemId);
-    }
-  }
 }

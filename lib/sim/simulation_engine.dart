@@ -1,10 +1,12 @@
 // Inti simulasi. Dart murni: TIDAK boleh mengimpor Flutter.
 //
-// Uang dan waktu global; semua logika pelanggan, antrean, ormas, segel, dan
-// laporan berjalan per toko. Bagian lain ada di file `part`:
+// Uang dan waktu global; semua logika pelanggan, antrean, kasir, ormas,
+// segel, dan laporan berjalan per toko. Bagian lain ada di file `part`:
 // - engine_toko.dart   : stok, harga, combo, buka kategori/item, ekspansi
-// - engine_layani.dart : pick & pack, kasir otomatis
+// - engine_usaha.dart  : buka cabang, kasir (rekrut, gaji)
+// - engine_layani.dart : pick & pack, proses kasir
 // - engine_ormas.dart  : ormas, segel, tebus
+// - engine_alert.dart  : alert, ucapan komik, efek komik
 // - engine_pesan.dart  : pesan SMS
 library;
 
@@ -12,6 +14,7 @@ import 'dart:collection';
 import 'dart:math' as math;
 
 import '../data/sim_data.dart';
+import '../data/ucapan_data.dart';
 import '../models/game_state.dart';
 import '../models/katalog.dart';
 import '../models/pesan_types.dart';
@@ -24,30 +27,37 @@ import 'pembuat_pesan.dart';
 import 'pembuat_pesanan.dart';
 import 'rumus_sim.dart';
 
+part 'engine_alert.dart';
 part 'engine_layani.dart';
 part 'engine_ormas.dart';
 part 'engine_pesan.dart';
 part 'engine_toko.dart';
+part 'engine_usaha.dart';
 
 class SimulationEngine {
+  /// [random] untuk simulasi; [randomUcapan] hanya untuk memilih teks
+  /// ucapan (kosmetik) agar urutan angka acak simulasi tidak terganggu.
   SimulationEngine({
     required JenisUsaha jenisUsaha,
     SimConfig? config,
     math.Random? random,
+    math.Random? randomUcapan,
     this.kedatanganOtomatis = true,
     this.jadwalAcakHarian = true,
   }) : config = config ?? simConfigDefault,
-       _random = random ?? math.Random() {
+       _random = random ?? math.Random(),
+       _randomUcapan = randomUcapan ?? math.Random() {
     final k = this.config.katalog[jenisUsaha]!;
     _s = GameState(uang: k.uangAwal, tokos: []);
     _pembuatPesan = PembuatPesan(this.config, _random);
     _pembuatPesanan = PembuatPesanan(this.config, _random);
-    _buatToko(k);
+    _buatToko(k, utama: true, slot: SlotJalan.tengah, nama: k.nama);
     _mulaiHari();
   }
 
   final SimConfig config;
   final math.Random _random;
+  final math.Random _randomUcapan;
   late final PembuatPesan _pembuatPesan;
   late final PembuatPesanan _pembuatPesanan;
 
@@ -66,9 +76,16 @@ class SimulationEngine {
   double? _jadwalKeluarga;
   final List<RiwayatKeluarga> _riwayatKeluarga = [];
   double _dikirimKeluargaHariIni = 0;
+  LaporanHarian? _laporanTerakhir;
+
+  // Alert, ucapan, efek (lihat engine_alert.dart).
   final List<AlertEvent> _alerts = [];
   int _idAlert = 0;
-  LaporanHarian? _laporanTerakhir;
+  final List<UcapanEvent> _ucapan = [];
+  final List<UcapanEvent> _riwayatUcapan = [];
+  int _idUcapan = 0;
+  final List<EfekKomik> _efek = [];
+  int _idEfek = 0;
 
   static const _maksKejadian = 4;
 
@@ -97,9 +114,6 @@ class SimulationEngine {
     }
     return config.fase.last;
   }
-
-  /// Alert terbaru di belakang. UI memakai [AlertEvent.id] untuk yang baru.
-  List<AlertEvent> get alerts => UnmodifiableListView(_alerts);
 
   /// Semua toko disegel penuh: waktu berjalan x10.
   double get pengaliWaktu =>
@@ -150,13 +164,6 @@ class SimulationEngine {
     return true;
   }
 
-  /// Tambah toko baru (persiapan multi-toko; belum dipakai di UI).
-  Toko tambahToko(JenisUsaha jenis) {
-    final t = _buatToko(config.katalog[jenis]!);
-    _mulaiHariToko(t);
-    return t;
-  }
-
   // --------------------------------------------------------- Kedatangan
 
   /// Satu pelanggan datang ke toko [tokoId] dan mengambil keputusan.
@@ -179,6 +186,7 @@ class SimulationEngine {
     final peluang = RumusSim.peluangBeli(tipe.sensitivitasHarga, rasio);
     if (_random.nextDouble() >= peluang) {
       _pergi(t, tipe, AlasanPergi.mahal, 0);
+      _ucapPelangganLewat(t, tipe, SituasiUcapan.mahal);
       return;
     }
 
@@ -190,6 +198,7 @@ class SimulationEngine {
     final Sisi sisi;
     if (!kiriMuat && !kananMuat) {
       _pergi(t, tipe, AlasanPergi.antreanPenuh, config.reputasiAntreanPenuh);
+      _ucapPelangganLewat(t, tipe, SituasiUcapan.antreanPenuh);
       return;
     } else if (!kananMuat || (kiriMuat && kiri < kanan)) {
       sisi = Sisi.kiri;
@@ -199,18 +208,18 @@ class SimulationEngine {
       sisi = _random.nextBool() ? Sisi.kiri : Sisi.kanan;
     }
 
-    t.antrean[sisi]!.add(
-      Pelanggan(
-        id: ++_idPelanggan,
-        tipe: tipe,
-        pesanan: pesanan,
-        kesabaranAwal: RumusSim.kesabaranTotal(
-          config,
-          tipe.kesabaranDasar,
-          pesanan.totalUnit,
-        ),
+    final p = Pelanggan(
+      id: ++_idPelanggan,
+      tipe: tipe,
+      pesanan: pesanan,
+      kesabaranAwal: RumusSim.kesabaranTotal(
+        config,
+        tipe.kesabaranDasar,
+        pesanan.totalUnit,
       ),
     );
+    t.antrean[sisi]!.add(p);
+    _ucapPelanggan(t, p, SituasiUcapan.sapaan, sisi: sisi);
   }
 
   // ---------------------------------------------------------- Internal
@@ -229,12 +238,19 @@ class SimulationEngine {
   double _acakAntara(double min, double maks) =>
       min + _random.nextDouble() * (maks - min);
 
-  Toko _buatToko(KatalogData k) {
+  Toko _buatToko(
+    KatalogData k, {
+    required bool utama,
+    required SlotJalan slot,
+    required String nama,
+  }) {
     final t = Toko(
       id: 'toko${_s.tokos.length + 1}',
-      nama: k.nama,
+      nama: nama,
       katalog: k,
       reputasi: config.reputasiAwal,
+      utama: utama,
+      slot: slot,
     );
     for (final i in k.item) {
       if (t.itemTersedia(i.id)) t.stok[i.id] = config.stokAwal;
@@ -251,6 +267,7 @@ class SimulationEngine {
     _s.waktu = 0;
     _s.hariSelesai = false;
     _jadwalKeluarga = null;
+    _ucapan.clear();
     for (final t in _s.tokos) {
       _mulaiHariToko(t);
     }
@@ -261,9 +278,12 @@ class SimulationEngine {
     if (jadwalAcakHarian) {
       final o = config.ormas;
       for (final t in _s.tokos) {
+        final peluang = t.utama
+            ? o.peluangPerHariUtama
+            : o.peluangPerHariCabang;
         if (!t.disegelPenuhHariIni &&
             _s.hari >= o.hariMulai &&
-            _random.nextDouble() < o.peluangPerHari) {
+            _random.nextDouble() < peluang) {
           t.jadwalOrmas = _detikDariJam(
             _acakAntara(o.jamMunculMin, o.jamMunculMaks),
           );
@@ -277,6 +297,7 @@ class SimulationEngine {
         );
       }
     }
+    _sinkronAlert();
   }
 
   void _mulaiHariToko(Toko t) {
@@ -284,6 +305,7 @@ class SimulationEngine {
     t.kejadian.clear();
     t.ormas = null;
     t.jadwalOrmas = null;
+    t.ormasDatangHariIni = false;
     t.kenaSegelHariIni = false;
     t.ditebusHariIni = false;
     t.tutupHariIni = false;
@@ -295,6 +317,7 @@ class SimulationEngine {
 
   void _langkah(double dt) {
     _s.waktu += dt;
+    _majukanUcapan(dt);
     for (final t in _s.tokos) {
       _langkahToko(t, dt);
       if (_s.hariSelesai) return; // semua toko tersegel
@@ -304,15 +327,16 @@ class SimulationEngine {
       _jadwalKeluarga = null;
       _kirimPesanKeluarga();
     }
+    _sinkronAlert();
 
     if (_s.waktu >= config.detikPerHari - 1e-9) _akhiriHari();
   }
 
   void _langkahToko(Toko t, double dt) {
     // Pelanggan: kesabaran turun (juga saat dilayani), 🚫 menghilang.
-    for (final antre in t.antrean.values) {
+    for (final e in t.antrean.entries) {
       final pergi = <Pelanggan>[];
-      for (final p in antre) {
+      for (final p in e.value) {
         if (p.status == StatusPelanggan.pergiStokHabis) {
           p.sisaTampil -= dt;
           if (p.sisaTampil <= 0) pergi.add(p);
@@ -323,9 +347,12 @@ class SimulationEngine {
           pergi.add(p);
           _lepasDariSesi(t, p);
           _pergi(t, p.tipe, AlasanPergi.antreLama, config.reputasiAntreLama);
+          _ucapPelanggan(t, p, SituasiUcapan.kabur, sisi: e.key);
+        } else {
+          _cekUcapanSabar(t, p, e.key);
         }
       }
-      antre.removeWhere(pergi.contains);
+      e.value.removeWhere(pergi.contains);
     }
 
     // Kedatangan (proses Poisson dengan laju yang bisa berubah).
@@ -338,18 +365,31 @@ class SimulationEngine {
       }
     }
 
-    // Ormas.
+    // Ormas (kemarahan naik walau toko tidak difokuskan).
     if (t.jadwalOrmas != null && _s.waktu >= t.jadwalOrmas!) {
-      t.jadwalOrmas = null;
-      _datangkanOrmas(t);
+      _jalankanJadwalOrmas(t);
     }
     if (t.ormas != null) {
       _tambahKemarahan(t, config.ormas.kemarahanPerDetik * dt);
       if (!t.buka) return; // tersegel
     }
 
-    // Kasir otomatis (debug).
-    if (t.kasirOtomatis && _bisaMelayani(t)) _langkahKasir(t, dt);
+    // Kasir (tidak bekerja saat toko disegel).
+    if (t.punyaKasir && _bisaMelayani(t)) _langkahKasir(t, dt);
+  }
+
+  /// Ucapan "Mana nih?" (< 60%) dan "Woy, cepetan!" (< 30%), masing-masing
+  /// sekali per pelanggan.
+  void _cekUcapanSabar(Toko t, Pelanggan p, Sisi sisi) {
+    final f = p.fraksiKesabaran;
+    if (f < config.ambangUcapanSabar2 && !p.sabar2Terucap) {
+      p.sabar1Terucap = true;
+      p.sabar2Terucap = true;
+      _ucapPelanggan(t, p, SituasiUcapan.sabar2, sisi: sisi);
+    } else if (f < config.ambangUcapanSabar1 && !p.sabar1Terucap) {
+      p.sabar1Terucap = true;
+      _ucapPelanggan(t, p, SituasiUcapan.sabar1, sisi: sisi);
+    }
   }
 
   /// Pelanggan [p] pergi: tutup panel Layani / proses kasir miliknya.
@@ -368,7 +408,12 @@ class SimulationEngine {
       t.prosesKasir = null;
       t.ormas = null;
       t.jadwalOrmas = null;
-      _s.uang = math.max(0, _s.uang - config.biayaSewaHarian);
+      // Sewa & gaji kasir dipotong per toko, juga saat toko disegel.
+      final sewa = sewaHarian(t.id);
+      final gaji = gajiKasir(t.id);
+      t.stat.sewa = sewa;
+      t.stat.gajiKasir = gaji;
+      _s.uang = math.max(0, _s.uang - sewa - gaji);
     }
     _jadwalKeluarga = null;
     _s.waktu = config.detikPerHari;
@@ -389,8 +434,13 @@ class SimulationEngine {
       // masuk ke hari berikutnya.
       t.stat = StatistikHarian();
     }
+    for (final a in _alerts) {
+      if (a.jenis == JenisAlert.uji) a.aktif = false;
+    }
+    _ucapan.clear();
     _dikirimKeluargaHariIni = 0;
     _s.hariSelesai = true;
+    _sinkronAlert();
   }
 
   LaporanToko _laporanToko(Toko t) {
@@ -418,10 +468,13 @@ class SimulationEngine {
       pendapatan: s.pendapatan,
       tip: s.tip,
       hpp: s.hpp,
-      biayaHarian: config.biayaSewaHarian,
+      biayaHarian: s.sewa,
+      gajiKasir: s.gajiKasir,
+      kasirLevel: t.kasirLevel,
       jatahOrmas: s.jatahOrmas,
       dendaSegel: s.denda,
       dilayani: s.dilayani,
+      dilayaniKasir: s.dilayaniKasir,
       perRating: Map.unmodifiable({
         for (final r in RatingKecepatan.values) r: s.perRating[r] ?? 0,
       }),
@@ -435,6 +488,7 @@ class SimulationEngine {
       itemTerlarisId: terlaris,
       jumlahTerlaris: jumlahTerlaris,
       statusSegel: status,
+      alertDikirim: s.alertDikirim,
     );
   }
 
@@ -491,19 +545,5 @@ class SimulationEngine {
   void _catat(Toko t, Kejadian k) {
     t.kejadian.insert(0, k);
     if (t.kejadian.length > _maksKejadian) t.kejadian.removeLast();
-  }
-
-  void _alert(JenisAlert jenis, Toko t, {String? itemId}) {
-    _alerts.add(
-      AlertEvent(
-        id: ++_idAlert,
-        jenis: jenis,
-        tokoId: t.id,
-        itemId: itemId,
-        hari: _s.hari,
-        jam: jam,
-      ),
-    );
-    if (_alerts.length > config.maksAlert) _alerts.removeAt(0);
   }
 }

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../models/toko.dart';
@@ -31,3 +33,23 @@ String labelItem(Toko t, String itemId) {
 /// "1 desimal" gaya Indonesia, dengan tanda: "+0,8".
 String formatDelta(double nilai) =>
     '${nilai >= 0 ? '+' : ''}${nilai.toStringAsFixed(1).replaceAll('.', ',')}';
+
+/// Warna badge / banner alert sesuai prioritas.
+Color warnaPrioritas(PrioritasAlert p) => switch (p) {
+  PrioritasAlert.tinggi => Colors.red.shade600,
+  PrioritasAlert.sedang => Colors.orange.shade700,
+  PrioritasAlert.rendah => Colors.amber.shade600,
+};
+
+String labelSlot(SlotJalan s) => switch (s) {
+  SlotJalan.kiri2 => 'Kiri jauh',
+  SlotJalan.kiri1 => 'Kiri',
+  SlotJalan.tengah => 'Tengah',
+  SlotJalan.kanan1 => 'Kanan',
+  SlotJalan.kanan2 => 'Kanan jauh',
+};
+
+/// "🧑‍💼" untuk kasir, "📢" untuk sistem.
+String emojiPembicara(Pembicara p) => p == Pembicara.kasir
+    ? TampilanData.emojiFigurKasir
+    : TampilanData.emojiAlertSistem;

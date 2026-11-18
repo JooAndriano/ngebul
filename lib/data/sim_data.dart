@@ -70,10 +70,20 @@ final SimConfig simConfigDefault = SimConfig(
   reputasiAntreanPenuh: -0.2,
   reputasiAntreLama: -0.8,
   durasiTampilPergi: 1.0,
-  kasirDurasiDasar: 1.5,
-  kasirDurasiPerUnit: 1.2,
-  kasirReputasi: 0.2,
-  biayaSewaHarian: 20000,
+  kasir: const KasirConfig(
+    biayaPerLevel: [250000, 600000, 1500000],
+    gajiHarianPerLevel: [40000, 70000, 110000],
+    faktorDurasiPerLevel: [1.0, 0.8, 0.65],
+    durasiDasar: 1.5,
+    durasiPerUnit: 1.2,
+    reputasi: 0.2,
+  ),
+  cabang: const CabangConfig(maksToko: 3, biaya: [2000000, 6000000]),
+  sewaHarianUtama: 20000,
+  sewaHarianCabang: 30000,
+  durasiUcapan: 2.5,
+  ambangUcapanSabar1: 0.6,
+  ambangUcapanSabar2: 0.3,
   ambangLaris: 0.8,
   ambangNormal: 0.4,
   langkahSimulasiMaks: 0.1,
@@ -91,7 +101,9 @@ final SimConfig simConfigDefault = SimConfig(
     namaSingkat: 'PPBL',
     emoji: '🕶️',
     hariMulai: 3,
-    peluangPerHari: 0.4,
+    peluangPerHariUtama: 0.3,
+    peluangPerHariCabang: 0.25,
+    tundaJikaAdaOrmasLain: 30,
     jamMunculMin: 10,
     jamMunculMaks: 17,
     persenJatah: 0.10,
@@ -210,6 +222,20 @@ abstract final class TampilanData {
 
   /// Potongan lapak tambahan per level ekspansi (placeholder).
   static const String emojiEkspansi = '⛺';
+
+  // Multi-toko, kasir, alert.
+  static const String emojiAntre = '👥';
+  static const String emojiFigurKasir = '🧑‍💼';
+  static const String emojiLonceng = '🔔';
+  static const String emojiAlertSistem = '📢';
+
+  /// Banner alert: maks tampil sekaligus & lama tampil (kecuali prioritas
+  /// tinggi, yang tetap tampil selama alert aktif).
+  static const int maksBannerAlert = 3;
+  static const Duration durasiBannerAlert = Duration(seconds: 6);
+
+  /// Font gelembung ucapan & efek komik (OFL, dibundel di assets/fonts).
+  static const String fontKomik = 'Bangers';
 }
 
 /// Angka game loop (bukan aturan simulasi).

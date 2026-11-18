@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
 import '../../sim/sim_controller.dart';
+import '../../sim/simulation_engine.dart';
 
 /// Kontrol debug. Ikon pembukanya hanya ada jika kDebugMode.
 class DebugPanel extends ConsumerWidget {
@@ -38,8 +39,8 @@ class DebugPanel extends ConsumerWidget {
           onChanged: c.setJeda,
         ),
         SwitchListTile(
-          title: const Text('Kasir otomatis'),
-          subtitle: const Text('Calon fitur pekerja: tanpa tip, +0,2 reputasi'),
+          title: const Text('Kasir debug (toko fokus)'),
+          subtitle: const Text('Kasir bekerja tanpa direkrut, kecepatan Lv1'),
           value: t.kasirOtomatis,
           onChanged: c.setKasirOtomatis,
         ),
@@ -53,13 +54,20 @@ class DebugPanel extends ConsumerWidget {
               child: Text('+${formatRupiah(DebugData.tambahUang)}'),
             ),
             OutlinedButton(
-              onPressed: t.ormas == null && t.buka && !e.hariSelesai
+              onPressed: !e.adaOrmasAktif && t.buka && !e.hariSelesai
                   ? () {
                       c.munculkanOrmas();
                       tutup();
                     }
                   : null,
-              child: const Text('Munculkan ormas'),
+              child: const Text('Munculkan ormas (toko fokus)'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                c.kirimAlertUji();
+                tutup();
+              },
+              child: const Text('Kirim alert uji'),
             ),
             OutlinedButton(
               onPressed: c.kirimPesanKeluarga,
