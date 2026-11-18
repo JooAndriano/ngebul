@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngebul/data/nama_saran.dart';
+import 'package:ngebul/models/katalog.dart';
 import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/app.dart';
@@ -42,6 +44,24 @@ void main() {
     expect(find.text('Warung Makanan'), findsOneWidget);
     await tester.tap(find.text('Warung Makanan'));
     await tester.pumpAndSettle();
+    // Dialog nama: kosong -> Mulai ditolak (toast), Acak nama -> saran.
+    expect(find.text('Beri nama warungmu'), findsOneWidget);
+    await tester.tap(find.text('Mulai'));
+    await tester.pump();
+    expect(find.text('Nama tidak boleh kosong.'), findsOneWidget); // toast
+    expect(find.text('Beri nama warungmu'), findsOneWidget);
+    await tester.tap(find.text('Acak nama'));
+    await tester.pump();
+    final saran = tester
+        .widget<TextField>(find.byType(TextField))
+        .controller!
+        .text;
+    expect(NamaSaranData.untuk(JenisUsaha.makanan), contains(saran));
+    await tester.enterText(find.byType(TextField), '  Kedai   Sinar Pagi ');
+    await tester.tap(find.text('Mulai'));
+    await tester.pumpAndSettle();
+    expect(engine.tokos.single.nama, 'Kedai Sinar Pagi');
+    expect(find.text('Kedai Sinar Pagi'), findsOneWidget); // tombol pemilih
     expect(find.text('Rp 200.000'), findsOneWidget);
     expect(find.textContaining('Hari ke-1'), findsOneWidget);
 

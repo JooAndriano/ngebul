@@ -52,17 +52,13 @@ extension AlertEngine on SimulationEngine {
     final templat = (olehKasir
         ? AlertTeksData.kasir
         : AlertTeksData.sistem)[jenis]!;
-    final teks = AlertTeksData.isi(
-      templat,
-      item: itemId == null ? '' : t.katalog.itemById(itemId).nama,
-      toko: t.nama,
-      ormas: config.ormas.namaSingkat,
-    );
+    final teks = _isiTeksAlert(templat, t, itemId);
     final a = AlertEvent(
       id: ++_idAlert,
       tokoId: t.id,
       jenis: jenis,
       prioritas: jenis.prioritas,
+      templat: templat,
       teks: teks,
       pembicara: olehKasir ? Pembicara.kasir : Pembicara.sistem,
       hari: _s.hari,
@@ -81,6 +77,25 @@ extension AlertEngine on SimulationEngine {
     }
     return a;
   }
+
+  String _isiTeksAlert(String templat, Toko t, String? itemId) =>
+      AlertTeksData.isi(
+        templat,
+        item: itemId == null ? '' : t.katalog.itemById(itemId).nama,
+        toko: t.nama,
+        ormas: config.ormas.namaSingkat,
+      );
+
+  /// Tulis ulang teks alert toko [t] dengan namanya yang sekarang.
+  void _perbaruiTeksAlert(Toko t) {
+    for (final a in _alerts) {
+      if (a.tokoId == t.id) a.teks = _isiTeksAlert(a.templat, t, a.itemId);
+    }
+  }
+
+  /// Jumlah alert aktif di toko [tokoId].
+  int jumlahAlertAktif(String tokoId) =>
+      _alerts.where((a) => a.aktif && a.tokoId == tokoId).length;
 
   /// Nonaktifkan alert yang kondisinya sudah hilang.
   void _sinkronAlert() {
@@ -139,7 +154,10 @@ extension AlertEngine on SimulationEngine {
   }) {
     final pilihan = teks != null
         ? [teks]
-        : UcapanData.pilihan(sumber, situasi, tipeId: tipeId);
+        : [
+            for (final x in UcapanData.pilihan(sumber, situasi, tipeId: tipeId))
+              x.replaceAll('{toko}', t.nama),
+          ];
     if (pilihan.isEmpty) return null;
     final u = UcapanEvent(
       id: ++_idUcapan,

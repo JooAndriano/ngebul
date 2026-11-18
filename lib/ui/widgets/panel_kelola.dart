@@ -8,6 +8,7 @@ import '../../models/toko.dart';
 import '../../sim/rumus_sim.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../notif/notif_service.dart';
 import 'ui_helper.dart';
 
 /// Panel 🍱: tab per kategori + tab Combo.
@@ -55,12 +56,21 @@ class PanelKelola extends ConsumerWidget {
   }
 }
 
-void _kabari(BuildContext context, String teks) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(content: Text(teks), duration: const Duration(seconds: 2)),
+void _kabari(BuildContext context, int terisi) {
+  final notif = NotifService.of(context);
+  if (terisi == 0) {
+    notif.peringatan(
+      'Tidak ada yang bisa diisi (stok cukup atau uang tidak cukup).',
+      judul: 'Isi stok',
+      emoji: TampilanData.emojiPanelKelola,
     );
+  } else {
+    notif.sukses(
+      '$terisi barang diisi.',
+      judul: 'Isi stok',
+      emoji: TampilanData.emojiPanelKelola,
+    );
+  }
 }
 
 class _KategoriTerkunci extends ConsumerWidget {
@@ -131,11 +141,7 @@ class _TabKategori extends ConsumerWidget {
               ),
               FilledButton.tonal(
                 onPressed: () {
-                  final n = c.isiSemuaMenipis();
-                  _kabari(
-                    context,
-                    n == 0 ? 'Tidak ada yang bisa diisi.' : '$n barang diisi.',
-                  );
+                  _kabari(context, c.isiSemuaMenipis());
                 },
                 child: const Text('Isi semua yang menipis'),
               ),

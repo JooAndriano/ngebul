@@ -200,10 +200,30 @@ Future<void> _jalankan(
 
   await bukaPanel('Warung');
   // Buka cabang lewat dialog.
+  await tester.ensureVisible(
+    find.textContaining('Buka Cabang (', skipOffstage: false),
+  );
+  await tester.pumpAndSettle();
   await tester.tap(find.textContaining('Buka Cabang ('));
-  await cek('dialog buka cabang');
-  await tester.tap(find.text('Buka'));
+  await cek('dialog buka cabang: jenis');
+  await tester.tap(find.text('Lanjut'));
+  await cek('dialog buka cabang: sisi');
+  await tester.tap(find.text('Lanjut'));
+  await cek('dialog buka cabang: nama');
+  await tester.tap(find.text('Lanjut'));
+  await cek('dialog buka cabang: konfirmasi');
+  await tester.tap(find.textContaining('Buka (Rp'));
   await cek('cabang 1 dibuka');
+  // Ubah nama (✏️) dengan nama terpanjang.
+  await tester.ensureVisible(
+    find.byTooltip('Ubah nama Cabang 1', skipOffstage: false),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byTooltip('Ubah nama Cabang 1'));
+  await cek('dialog ubah nama');
+  await tester.enterText(find.byType(TextField), 'Warung Mbah Darmi XY');
+  await tester.tap(find.text('Simpan'));
+  await cek('nama panjang');
   await tutupPanel();
 
   // Multi-toko ramai: 3 toko, kasir, alert, ormas, ucapan di toko fokus.
@@ -224,6 +244,18 @@ Future<void> _jalankan(
   e.tick(50); // marah80
   ctrl.setJeda(false);
   await cek('multi-toko + kasir + alert');
+
+  // Dropdown pemilih toko (ikon ormas berdenyut: jangan pumpAndSettle).
+  await tester.tap(find.byKey(const ValueKey('tombol-pemilih-toko')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  langkah = 'dropdown toko';
+  for (var i = 0; i < masalah.length; i++) {
+    if (!masalah[i].startsWith('[')) masalah[i] = '[$langkah] ${masalah[i]}';
+  }
+  await tester.tap(find.byKey(ValueKey('baris-toko-${e.tokos[2].id}')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
 
   await bukaPanel('Warung');
   await tutupPanel();

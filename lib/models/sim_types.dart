@@ -132,6 +132,7 @@ class AlertEvent {
     required this.tokoId,
     required this.jenis,
     required this.prioritas,
+    required this.templat,
     required this.teks,
     required this.pembicara,
     required this.hari,
@@ -144,7 +145,13 @@ class AlertEvent {
   final String tokoId;
   final JenisAlert jenis;
   final PrioritasAlert prioritas;
-  final String teks;
+
+  /// Templat teks ({toko}, {item}, {ormas}); dipakai engine untuk
+  /// memperbarui [teks] saat toko diganti nama.
+  final String templat;
+
+  /// Teks yang tampil (selalu memakai nama toko terkini). Hanya diubah engine.
+  String teks;
   final Pembicara pembicara;
   final int hari;
 

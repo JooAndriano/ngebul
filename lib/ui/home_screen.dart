@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,7 +7,8 @@ import '../data/ucapan_data.dart';
 import '../models/sim_types.dart';
 import '../sim/sim_controller.dart';
 import '../sim/simulation_engine.dart';
-import 'widgets/banner_alert.dart';
+import 'notif/notif_model.dart';
+import 'notif/notif_service.dart';
 import 'widgets/banner_ormas.dart';
 import 'widgets/floating_text.dart';
 import 'widgets/gelembung_komik.dart';
@@ -22,8 +21,9 @@ import 'widgets/panel_samping.dart';
 import 'widgets/scene_warung.dart';
 import 'widgets/ui_helper.dart';
 
-/// Layar utama (landscape): scene toko fokus + HUD (tab toko) + ikon tepi +
-/// side sheet, panel Layani di atas scene saat melayani pelanggan.
+/// Layar utama (landscape): scene toko fokus + HUD (pemilih toko) + ikon
+/// tepi + side sheet, panel Layani di atas scene saat melayani pelanggan.
+/// Alert tampil sebagai toast (lihat lib/ui/notif).
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -39,33 +39,63 @@ class _Melayang {
   final double geserX;
 }
 
+/// Kunci dedup toast untuk alert (toko + jenis + item).
+String kunciNotifAlert(AlertEvent a) =>
+    'alert:${a.tokoId}:${a.jenis.name}:${a.itemId ?? ''}';
+
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final List<_Melayang> _melayang = [];
   int _idMelayang = 0;
+  double _lebarPanel = 320;
 
-  /// Id alert yang sedang tampil sebagai banner (terbaru di depan).
-  final List<int> _banner = [];
-  final List<Timer> _timerBanner = [];
-
-  @override
-  void dispose() {
-    for (final t in _timerBanner) {
-      t.cancel();
-    }
-    super.dispose();
-  }
+  NotifService get _notif => ref.read(notifServiceProvider);
 
   void _bukaPanel(JenisPanel panel) {
     ref.read(simControllerProvider.notifier).bukaPanel(panel);
     _scaffoldKey.currentState?.openEndDrawer();
+    // Toast bergeser ke area yang tidak tertutup sidebar.
+    _notif.insetKanan = _lebarPanel;
   }
 
-  /// Alert diketuk: fokus ke tokonya + buka panel yang relevan.
+  /// Alert diketuk (🔔 / toast): fokus ke tokonya + buka panel relevan.
   void _bukaAlert(AlertEvent a) {
-    setState(() => _banner.remove(a.id));
     final panel = ref.read(simControllerProvider.notifier).bukaAlert(a);
     if (panel != null) _bukaPanel(panel);
+  }
+
+  void _toastAlert(SimulationEngine e, AlertEvent a) {
+    final t = e.toko(a.tokoId);
+    final (jenis, aksi) = switch (a.jenis) {
+      JenisAlert.stokHabis ||
+      JenisAlert.stokMenipis => (JenisNotif.peringatan, 'Kelola stok'),
+      JenisAlert.ormasHadir ||
+      JenisAlert.ormasMarah80 ||
+      JenisAlert.segel => (JenisNotif.bahaya, 'Tangani'),
+      JenisAlert.uji => (JenisNotif.info, 'Ke toko'),
+    };
+    final olehKasir = a.pembicara == Pembicara.kasir;
+    final emoji = olehKasir
+        ? TampilanData.emojiAvatarKasir
+        : switch (a.jenis) {
+            JenisAlert.ormasHadir ||
+            JenisAlert.ormasMarah80 => e.config.ormas.emoji,
+            JenisAlert.segel => TampilanData.emojiSegel,
+            _ => TampilanData.emojiAlertSistem,
+          };
+    _notif.tampilkan(
+      NotifModel(
+        jenis: jenis,
+        prioritas: PrioritasNotif.values[a.prioritas.index],
+        judul: t.nama,
+        pesan: olehKasir ? '“${a.teks}”' : a.teks,
+        emoji: emoji,
+        kunci: kunciNotifAlert(a),
+        aksi: AksiNotif(aksi, () {
+          if (mounted) _bukaAlert(a);
+        }),
+      ),
+    );
   }
 
   void _tampilkanHasil(HasilLayani h) {
@@ -101,33 +131,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _tambahBanner(AlertEvent a) {
-    _timerBanner.removeWhere((t) => !t.isActive);
-    setState(() {
-      _banner.insert(0, a.id);
-      if (_banner.length > 20) _banner.removeLast();
-    });
-    if (a.prioritas != PrioritasAlert.tinggi) {
-      _timerBanner.add(
-        Timer(TampilanData.durasiBannerAlert, () {
-          if (mounted) setState(() => _banner.remove(a.id));
-        }),
-      );
-    }
-  }
-
-  /// Banner yang masih layak tampil: prioritas tinggi hanya selama aktif.
-  List<AlertEvent> _bannerTampil(SimulationEngine e) {
-    final hasil = <AlertEvent>[];
-    for (final id in _banner) {
-      final a = e.alerts.where((x) => x.id == id).firstOrNull;
-      if (a == null || !a.aktif) continue;
-      hasil.add(a);
-      if (hasil.length >= TampilanData.maksBannerAlert) break;
-    }
-    return hasil;
-  }
-
   @override
   Widget build(BuildContext context) {
     // Selector memakai engineAtauNull: saat "ulang pilih jenis usaha" engine
@@ -146,7 +149,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     );
 
-    // Alert baru -> banner.
+    // Alert baru -> toast.
     ref.listen<int>(
       simControllerProvider.select((v) {
         final alerts = v.engineAtauNull?.alerts;
@@ -156,7 +159,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final e = ref.read(simControllerProvider).engineAtauNull;
         if (e == null) return;
         for (final a in e.alerts) {
-          if (a.id > (sebelum ?? 0) && a.aktif) _tambahBanner(a);
+          if (a.id > (sebelum ?? 0) && a.aktif) _toastAlert(e, a);
+        }
+      },
+    );
+
+    // Alert selesai (stok terisi, ormas pergi) -> kartunya ditutup.
+    ref.listen<String>(
+      simControllerProvider.select(
+        (v) => v.engineAtauNull?.alertAktif.map((a) => a.id).join(',') ?? '',
+      ),
+      (_, _) {
+        final e = ref.read(simControllerProvider).engineAtauNull;
+        if (e == null) return;
+        final aktif = {for (final a in e.alertAktif) kunciNotifAlert(a)};
+        for (final a in e.alerts) {
+          final k = kunciNotifAlert(a);
+          if (!a.aktif && !aktif.contains(k)) _notif.tutupKunci(k);
         }
       },
     );
@@ -180,18 +199,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     final v = ref.watch(simControllerProvider);
-    final e = v.engine;
     final t = v.toko;
     final lebar = MediaQuery.sizeOf(context).width;
-    final banner = _bannerTampil(e);
+    _lebarPanel = (lebar * 0.6).clamp(320.0, 520.0);
 
     return Scaffold(
       key: _scaffoldKey,
-      endDrawer: PanelSamping(
-        panel: v.panel,
-        lebar: (lebar * 0.6).clamp(320.0, 520.0),
-      ),
+      endDrawer: PanelSamping(panel: v.panel, lebar: _lebarPanel),
       onEndDrawerChanged: (terbuka) {
+        _notif.insetKanan = terbuka ? _lebarPanel : 0;
         if (!terbuka) ref.read(simControllerProvider.notifier).tutupPanel();
       },
       body: SafeArea(
@@ -237,32 +253,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               right: 0,
               child: IkonTepi(onBuka: _bukaPanel),
             ),
-            if (banner.isNotEmpty)
-              Positioned(
-                top: Hud.tinggi + 4,
-                left: 8,
-                right: IkonTepi.lebar + 8,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final a in banner)
-                          BannerAlert(
-                            key: ValueKey(a.id),
-                            alert: a,
-                            namaToko: e.toko(a.tokoId).nama,
-                            tokoLain: a.tokoId != t.id,
-                            onTap: () => _bukaAlert(a),
-                            onTutup: () => setState(() => _banner.remove(a.id)),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             for (final m in _melayang)
               Positioned(
                 key: ValueKey(m.id),

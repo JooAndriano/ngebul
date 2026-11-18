@@ -13,6 +13,7 @@ library;
 import 'dart:collection';
 import 'dart:math' as math;
 
+import '../core/nama_validator.dart';
 import '../data/sim_data.dart';
 import '../data/ucapan_data.dart';
 import '../models/game_state.dart';
@@ -39,6 +40,7 @@ class SimulationEngine {
   /// ucapan (kosmetik) agar urutan angka acak simulasi tidak terganggu.
   SimulationEngine({
     required JenisUsaha jenisUsaha,
+    String? namaToko,
     SimConfig? config,
     math.Random? random,
     math.Random? randomUcapan,
@@ -51,7 +53,14 @@ class SimulationEngine {
     _s = GameState(uang: k.uangAwal, tokos: []);
     _pembuatPesan = PembuatPesan(this.config, _random);
     _pembuatPesanan = PembuatPesanan(this.config, _random);
-    _buatToko(k, utama: true, slot: SlotJalan.tengah, nama: k.nama);
+    // Nama tidak valid -> nama jenis usaha.
+    final cek = NamaValidator.periksa(namaToko ?? '');
+    _buatToko(
+      k,
+      utama: true,
+      slot: SlotJalan.tengah,
+      nama: cek.valid ? cek.nama : k.nama,
+    );
     _mulaiHari();
   }
 

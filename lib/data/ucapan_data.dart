@@ -135,9 +135,9 @@ abstract final class UcapanData {
 
   static const Map<SituasiUcapan, List<String>> kasir = {
     SituasiUcapan.kasirRekrut: [
-      'Siap, Bos!',
-      'Siap kerja, Bos!',
-      'Mohon bimbingannya, Bos!',
+      'Siap jaga {toko}, Bos!',
+      'Siap kerja di {toko}, Bos!',
+      'Mohon bimbingannya di {toko}, Bos!',
     ],
   };
 
@@ -166,14 +166,14 @@ abstract final class UcapanData {
 
 /// Templat teks alert. `{item}`, `{toko}`, `{ormas}` diganti engine.
 abstract final class AlertTeksData {
-  /// Diucapkan kasir jika toko punya kasir.
+  /// Diucapkan kasir jika toko punya kasir. Selalu menyebut {toko}.
   static const Map<JenisAlert, String> kasir = {
-    JenisAlert.stokHabis: 'Bos, {item} habis!',
-    JenisAlert.stokMenipis: 'Bos, {item} tinggal sedikit.',
-    JenisAlert.ormasHadir: 'Bos, ada {ormas} minta jatah!',
-    JenisAlert.ormasMarah80: 'Bos, {ormas} udah ngamuk!',
-    JenisAlert.segel: 'Bos, toko kita disegel!',
-    JenisAlert.uji: 'Bos, ini cuma alert uji.',
+    JenisAlert.stokHabis: 'Bos, {item} habis di {toko}!',
+    JenisAlert.stokMenipis: 'Bos, {item} di {toko} tinggal sedikit.',
+    JenisAlert.ormasHadir: 'Bos, ada {ormas} minta jatah di {toko}!',
+    JenisAlert.ormasMarah80: 'Bos, {ormas} di {toko} udah ngamuk!',
+    JenisAlert.segel: 'Bos, {toko} disegel!',
+    JenisAlert.uji: 'Bos, ini cuma alert uji di {toko}.',
   };
 
   /// Teks sistem jika toko belum punya kasir.

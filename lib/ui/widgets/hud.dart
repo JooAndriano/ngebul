@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
-import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import 'pemilih_toko.dart';
 import 'ui_helper.dart';
 
-/// Baris atas: tab toko, uang, hari, jam, fase, 🔔, reputasi toko fokus.
+/// Baris atas: pemilih toko, uang, hari, jam, fase, 🔔, reputasi toko fokus.
 class Hud extends ConsumerWidget {
   const Hud({super.key, required this.onBukaAlert});
 
@@ -39,25 +39,8 @@ class Hud extends ConsumerWidget {
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.92),
       child: Row(
         children: [
-          // Tab toko: hanya toko fokus yang bisa diketuk di scene.
-          Flexible(
-            flex: 5,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (var i = 0; i < e.tokos.length; i++)
-                    _TabToko(
-                      engine: e,
-                      toko: e.tokos[i],
-                      dipilih: i == v.indeksToko,
-                      onTap: () =>
-                          ref.read(simControllerProvider.notifier).pilihToko(i),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          // Pemilih toko (dropdown): pengganti tab antar toko.
+          const Flexible(flex: 5, child: PemilihToko()),
           const SizedBox(width: 8),
           Flexible(
             flex: 3,
@@ -125,88 +108,6 @@ class Hud extends ConsumerWidget {
       if (p == null || x.prioritas.index > p.index) p = x.prioritas;
     }
     return p;
-  }
-}
-
-/// Tab satu toko: emoji jenis + nama + jumlah antrean + badge alert aktif
-/// berwarna sesuai prioritas tertinggi.
-class _TabToko extends StatelessWidget {
-  const _TabToko({
-    required this.engine,
-    required this.toko,
-    required this.dipilih,
-    required this.onTap,
-  });
-
-  final SimulationEngine engine;
-  final Toko toko;
-  final bool dipilih;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final prioritas = engine.prioritasAlertToko(toko.id);
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: Material(
-        color: dipilih ? scheme.primary : scheme.surface.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(toko.katalog.emoji),
-                const SizedBox(width: 4),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 110),
-                  child: Text(
-                    toko.nama,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: dipilih ? scheme.onPrimary : null,
-                      fontWeight: dipilih ? FontWeight.bold : null,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${TampilanData.emojiAntre}${toko.jumlahAntre}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: dipilih ? scheme.onPrimary : null,
-                  ),
-                ),
-                if (toko.kondisiSegel) ...[
-                  const SizedBox(width: 2),
-                  const Text(
-                    TampilanData.emojiSegel,
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
-                if (prioritas != null) ...[
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: warnaPrioritas(prioritas),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

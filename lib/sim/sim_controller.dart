@@ -137,8 +137,11 @@ class SimController extends Notifier<SimView> {
   }
 
   // Awal permainan
-  void mulai(JenisUsaha jenis) {
-    _engine = _buatEngine(jenis);
+  /// Mulai dengan toko pertama [jenis]; [nama] tidak valid diabaikan
+  /// (toko memakai nama jenis usaha).
+  void mulai(JenisUsaha jenis, {String? nama}) {
+    final e = _engine = _buatEngine(jenis);
+    if (nama != null) e.ubahNamaToko(e.tokos.first.id, nama);
     _perbarui(indeksToko: 0, tutupPanel: true);
   }
 
@@ -170,11 +173,15 @@ class SimController extends Notifier<SimView> {
 
   // Usaha (cabang & kasir)
   /// Buka cabang lalu fokus ke cabang baru. Null jika gagal.
-  Toko? bukaCabang(JenisUsaha jenis, Sisi sisi) {
-    final t = _e.bukaCabang(jenis, sisi);
+  Toko? bukaCabang(JenisUsaha jenis, Sisi sisi, {String? nama}) {
+    final t = _e.bukaCabang(jenis, sisi, nama: nama);
     _perbarui(indeksToko: t == null ? null : _e.tokos.length - 1);
     return t;
   }
+
+  /// Ganti nama toko [tokoId]. Pesan error, atau null jika berhasil.
+  String? ubahNamaToko(String tokoId, String nama) =>
+      _aksi(() => _e.ubahNamaToko(tokoId, nama));
 
   bool rekrutKasir() => _aksi(() => _e.rekrutKasir(_tokoId));
 

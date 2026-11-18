@@ -5,6 +5,7 @@ import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/rumus_sim.dart';
 import '../../sim/simulation_engine.dart';
+import '../theme/ngebul_theme.dart';
 
 String emojiStatus(StatusEtalase s) => switch (s) {
   StatusEtalase.laris => TampilanData.emojiLaris,
@@ -35,11 +36,12 @@ String formatDelta(double nilai) =>
     '${nilai >= 0 ? '+' : ''}${nilai.toStringAsFixed(1).replaceAll('.', ',')}';
 
 /// Warna badge / banner alert sesuai prioritas.
-Color warnaPrioritas(PrioritasAlert p) => switch (p) {
-  PrioritasAlert.tinggi => Colors.red.shade600,
-  PrioritasAlert.sedang => Colors.orange.shade700,
-  PrioritasAlert.rendah => Colors.amber.shade600,
-};
+Color warnaPrioritas(PrioritasAlert p) => NgebulTheme.warnaPrioritas(p);
+
+/// Nama toko terkini untuk laporan (laporan menyimpan nama saat dibuat;
+/// jika toko diganti nama, tampilkan nama baru).
+String namaTokoTerkini(SimulationEngine e, String tokoId, String cadangan) =>
+    e.tokos.where((t) => t.id == tokoId).firstOrNull?.nama ?? cadangan;
 
 String labelSlot(SlotJalan s) => switch (s) {
   SlotJalan.kiri2 => 'Kiri jauh',

@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
-import '../../models/katalog.dart';
 import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import 'dialog_toko.dart';
 import 'laporan_view.dart';
 import 'ui_helper.dart';
 
@@ -85,13 +85,14 @@ class PanelWarung extends ConsumerWidget {
             toko: e.tokos[i],
             fokus: i == v.indeksToko,
             onTap: () => ctrl.pilihToko(i),
+            onUbahNama: () => ubahNamaToko(context, ref, e.tokos[i]),
           ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
             onPressed: biayaCabang != null && e.uang >= biayaCabang
-                ? () => _dialogBukaCabang(context, ref)
+                ? () => tampilkanDialogBukaCabang(context)
                 : null,
             icon: const Icon(Icons.add_business),
             label: Text(
@@ -152,12 +153,14 @@ class _BarisToko extends StatelessWidget {
     required this.toko,
     required this.fokus,
     required this.onTap,
+    required this.onUbahNama,
   });
 
   final SimulationEngine engine;
   final Toko toko;
   final bool fokus;
   final VoidCallback onTap;
+  final VoidCallback onUbahNama;
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +188,17 @@ class _BarisToko extends StatelessWidget {
           '${TampilanData.emojiAntre}${toko.jumlahAntre} • $status • '
           'sewa ${formatRupiah(engine.sewaHarian(toko.id))}/hari',
         ),
-        trailing: fokus ? const Icon(Icons.visibility) : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (fokus) const Icon(Icons.visibility),
+            IconButton(
+              tooltip: 'Ubah nama ${toko.nama}',
+              onPressed: onUbahNama,
+              icon: const Text('✏️', style: TextStyle(fontSize: 18)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -252,88 +265,4 @@ class _KartuKasir extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Pilih jenis usaha & sisi jalan untuk cabang baru.
-Future<void> _dialogBukaCabang(BuildContext context, WidgetRef ref) {
-  var jenis = JenisUsaha.sembako;
-  Sisi? sisi;
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        final e = ref.read(simControllerProvider).engine;
-        sisi ??= e.slotTersedia(Sisi.kiri) ? Sisi.kiri : Sisi.kanan;
-        final biaya = e.biayaCabangBerikutnya;
-        return AlertDialog(
-          title: const Text('Buka Cabang'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Jenis usaha'),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final k in e.config.katalog.values)
-                      ChoiceChip(
-                        label: Text('${k.emoji} ${k.nama}'),
-                        selected: jenis == k.jenis,
-                        onSelected: (_) => setState(() => jenis = k.jenis),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Sisi jalan'),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final s in Sisi.values)
-                      ChoiceChip(
-                        label: Text(s == Sisi.kiri ? 'Kiri' : 'Kanan'),
-                        selected: sisi == s,
-                        onSelected: e.slotTersedia(s)
-                            ? (_) => setState(() => sisi = s)
-                            : null,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Biaya ${biaya == null ? '-' : formatRupiah(biaya)} • sewa '
-                  '${formatRupiah(e.config.sewaHarianCabang)}/hari. Mulai '
-                  'dengan stok ${e.config.stokAwal} per barang dan reputasi '
-                  '${e.config.reputasiAwal.toStringAsFixed(0)}.',
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed:
-                  biaya != null &&
-                      e.uang >= biaya &&
-                      sisi != null &&
-                      e.slotTersedia(sisi!)
-                  ? () {
-                      ref
-                          .read(simControllerProvider.notifier)
-                          .bukaCabang(jenis, sisi!);
-                      Navigator.of(ctx).pop();
-                    }
-                  : null,
-              child: const Text('Buka'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
 }

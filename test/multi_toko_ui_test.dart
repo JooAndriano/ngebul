@@ -6,14 +6,14 @@ import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/app.dart';
-import 'package:ngebul/ui/widgets/banner_alert.dart';
+import 'package:ngebul/ui/notif/toast_host.dart';
 import 'package:ngebul/ui/widgets/gelembung_komik.dart';
 
 import 'fake_random.dart';
 import 'helper.dart';
 
 void main() {
-  testWidgets('tab toko, banner alert, kasir, ucapan toko fokus', (
+  testWidgets('buka cabang, toast alert, kasir, ucapan toko fokus', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(2340, 1080); // 780 x 360 dp
@@ -43,21 +43,37 @@ void main() {
       tester.element(find.byType(NgebulApp)),
     );
     final ctrl = container.read(simControllerProvider.notifier);
-    ctrl.mulai(JenisUsaha.makanan);
+    ctrl.mulai(JenisUsaha.makanan, nama: 'Kedai Sinar Pagi');
     await tester.pumpAndSettle();
 
-    // Buka cabang lewat panel 🏠.
+    // Buka cabang lewat panel 🏠: jenis -> sisi -> nama -> konfirmasi.
     e.debugTambahUang(2000000);
     await tester.tap(find.text('Warung'));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Buka Cabang ('));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Warung Sembako'));
+    await tester.tap(find.text('Lanjut'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kanan'));
-    await tester.tap(find.text('Buka'));
+    await tester.tap(find.text('Lanjut'));
+    await tester.pumpAndSettle();
+    // Nama default "Cabang 1"; nama yang sudah dipakai ditolak.
+    expect(find.text('Cabang 1'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'kedai sinar PAGI');
+    await tester.pump();
+    expect(find.text('Nama sudah dipakai toko lain.'), findsOneWidget);
+    await tester.tap(find.text('Lanjut'));
+    await tester.pump();
+    expect(find.text('Lanjut'), findsOneWidget); // masih di langkah nama
+    await tester.enterText(find.byType(TextField), 'Toko Berkah');
+    await tester.tap(find.text('Lanjut'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Buka (Rp'));
     await tester.pumpAndSettle();
     expect(e.tokos, hasLength(2));
     expect(e.tokos[1].slot, SlotJalan.kanan1);
+    expect(e.tokos[1].nama, 'Toko Berkah');
     expect(container.read(simControllerProvider).toko.id, 'toko2');
     await tester.tap(find.byTooltip('Tutup panel'));
     await tester.pumpAndSettle();
@@ -93,19 +109,27 @@ void main() {
     await tester.pump();
     expect(find.byType(GelembungKomik), findsOneWidget); // sapaan IRT
 
-    // Alert stok habis di toko2 -> banner; ketuk -> fokus toko2 + Kelola.
+    // Alert stok habis di toko2 -> toast berjudul nama toko; aksi
+    // "Kelola stok" -> fokus toko2 + Kelola.
     ctrl.pilihToko(0);
     e.toko('toko2').stok['beras'] = 1;
     layaniPenuh(e, Sisi.kiri, tokoId: 'toko2');
     ctrl.setJeda(false);
     await tester.pump();
-    expect(find.byType(BannerAlert), findsNWidgets(2)); // + es teh menipis
-    final banner = find.ancestor(
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(ToastCard), findsNWidgets(2)); // + es teh menipis
+    final toast = find.ancestor(
       of: find.textContaining('Beras 1 kg'),
-      matching: find.byType(BannerAlert),
+      matching: find.byType(ToastCard),
     );
-    expect(banner, findsOneWidget);
-    await tester.tap(banner);
+    expect(toast, findsOneWidget);
+    expect(
+      find.descendant(of: toast, matching: find.text('Toko Berkah')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(of: toast, matching: find.text('Kelola stok')),
+    );
     await tester.pumpAndSettle();
     final v = container.read(simControllerProvider);
     expect(v.toko.id, 'toko2');
@@ -114,10 +138,10 @@ void main() {
     await tester.tap(find.byTooltip('Tutup panel'));
     await tester.pumpAndSettle();
 
-    // Banner prioritas rendah/sedang hilang sendiri setelah 6 detik.
+    // Toast hilang sendiri; alert tetap ada di 🔔 selama aktif.
     await tester.pump(const Duration(seconds: 7));
-    expect(find.byType(BannerAlert), findsNothing);
-    // Tapi tetap ada di daftar 🔔 selama aktif.
+    await tester.pumpAndSettle();
+    expect(find.byType(ToastCard), findsNothing);
     expect(e.alertAktif, isNotEmpty);
   });
 }

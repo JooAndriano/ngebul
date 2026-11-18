@@ -5,6 +5,7 @@ import '../core/number_format.dart';
 import '../data/sim_data.dart';
 import '../models/katalog.dart';
 import '../sim/sim_controller.dart';
+import 'widgets/dialog_toko.dart';
 
 /// Layar awal: pilih jenis usaha toko pertama.
 class PilihUsahaScreen extends ConsumerWidget {
@@ -36,9 +37,17 @@ class PilihUsahaScreen extends ConsumerWidget {
                       Expanded(
                         child: _KartuUsaha(
                           katalog: k,
-                          onPilih: () => ref
-                              .read(simControllerProvider.notifier)
-                              .mulai(k.jenis),
+                          onPilih: () async {
+                            final nama = await tampilkanDialogNama(
+                              context,
+                              jenis: k.jenis,
+                              labelSimpan: 'Mulai',
+                            );
+                            if (nama == null) return;
+                            ref
+                                .read(simControllerProvider.notifier)
+                                .mulai(k.jenis, nama: nama);
+                          },
                         ),
                       ),
                   ],

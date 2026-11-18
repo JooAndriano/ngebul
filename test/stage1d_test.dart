@@ -207,7 +207,7 @@ void main() {
       expect(jumlahAlert(e, JenisAlert.stokHabis, itemId: 'es_teh'), 1);
       final a = e.alerts.single;
       expect(a.pembicara, Pembicara.kasir);
-      expect(a.teks, 'Bos, Es Teh Manis habis!');
+      expect(a.teks, 'Bos, Es Teh Manis habis di Warung Makanan!');
       e.tick(e.sisaDetikHari);
       expect(e.laporanTerakhir!.toko.single.hilang[AlasanPergi.stokHabis], 2);
     });

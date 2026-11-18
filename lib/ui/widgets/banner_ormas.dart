@@ -6,6 +6,8 @@ import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../notif/notif_model.dart';
+import '../notif/notif_service.dart';
 
 /// Banner pilihan saat ormas hadir. Game tidak pause.
 class BannerOrmas extends ConsumerWidget {
@@ -35,20 +37,45 @@ class BannerOrmas extends ConsumerWidget {
     };
 
     void kabari(HasilOrmas h) {
-      final pesan = switch (h) {
-        HasilOrmas.dibayar => 'Jatah dibayar. Mereka pergi.',
-        HasilOrmas.tawarDiterima => 'Tawaran diterima. Mereka pergi.',
-        HasilOrmas.tawarDitolak => 'Tawaran ditolak! Mereka makin marah.',
-        HasilOrmas.rtBerhasil => 'Pak RT berhasil mengusir mereka.',
-        HasilOrmas.rtGagal => 'Pak RT gagal. Mereka makin marah.',
-        HasilOrmas.uangKurang => 'Uang tidak cukup.',
-        HasilOrmas.tidakBisa => 'Tidak bisa.',
+      final (jenis, pesan) = switch (h) {
+        HasilOrmas.dibayar => (
+          JenisNotif.sukses,
+          'Jatah dibayar. Mereka pergi.',
+        ),
+        HasilOrmas.tawarDiterima => (
+          JenisNotif.sukses,
+          'Tawaran diterima. Mereka pergi.',
+        ),
+        HasilOrmas.tawarDitolak => (
+          JenisNotif.bahaya,
+          'Tawaran ditolak! Mereka makin marah.',
+        ),
+        HasilOrmas.rtBerhasil => (
+          JenisNotif.sukses,
+          'Pak RT berhasil mengusir mereka.',
+        ),
+        HasilOrmas.rtGagal => (
+          JenisNotif.bahaya,
+          'Pak RT gagal. Mereka makin marah.',
+        ),
+        HasilOrmas.uangKurang => (JenisNotif.peringatan, 'Uang tidak cukup.'),
+        HasilOrmas.tidakBisa => (JenisNotif.peringatan, 'Tidak bisa.'),
       };
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(pesan), duration: const Duration(seconds: 2)),
-        );
+      ref
+          .read(notifServiceProvider)
+          .tampilkan(
+            NotifModel(
+              jenis: jenis,
+              prioritas: jenis == JenisNotif.sukses
+                  ? PrioritasNotif.rendah
+                  : PrioritasNotif.sedang,
+              judul: v.toko.nama,
+              pesan: pesan,
+              emoji: h == HasilOrmas.rtBerhasil || h == HasilOrmas.rtGagal
+                  ? TampilanData.emojiPakRt
+                  : c.emoji,
+            ),
+          );
     }
 
     return Material(

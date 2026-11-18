@@ -229,10 +229,9 @@ abstract final class TampilanData {
   static const String emojiLonceng = '🔔';
   static const String emojiAlertSistem = '📢';
 
-  /// Banner alert: maks tampil sekaligus & lama tampil (kecuali prioritas
-  /// tinggi, yang tetap tampil selama alert aktif).
-  static const int maksBannerAlert = 3;
-  static const Duration durasiBannerAlert = Duration(seconds: 6);
+  /// Avatar kasir di toast alert, ikon ormas aktif di dropdown toko.
+  static const String emojiAvatarKasir = '🧑‍🍳';
+  static const String emojiOrmasAktif = '🕴️';
 
   /// Font gelembung ucapan & efek komik (OFL, dibundel di assets/fonts).
   static const String fontKomik = 'Bangers';

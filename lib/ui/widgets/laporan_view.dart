@@ -65,7 +65,9 @@ class _LaporanViewState extends State<LaporanView> {
               ),
               for (final l in laporan.toko)
                 ChoiceChip(
-                  label: Text(l.namaToko),
+                  label: Text(
+                    namaTokoTerkini(widget.engine, l.tokoId, l.namaToko),
+                  ),
                   selected: dipilih?.tokoId == l.tokoId,
                   onSelected: (_) => setState(() => _tab = l.tokoId),
                 ),
@@ -113,7 +115,8 @@ class _LaporanViewState extends State<LaporanView> {
     const SizedBox(height: 8),
     for (final t in l.toko)
       _Baris(
-        '• ${t.namaToko} (${t.statusSegel.label})',
+        '• ${namaTokoTerkini(widget.engine, t.tokoId, t.namaToko)} '
+        '(${t.statusSegel.label})',
         formatRupiah(t.untungBersih),
         indent: 12,
         warna: _warnaUntung(theme, t.untungBersih),
@@ -123,6 +126,12 @@ class _LaporanViewState extends State<LaporanView> {
   List<Widget> _perToko(ThemeData theme, LaporanToko l) {
     final e = widget.engine;
     return [
+      Text(
+        namaTokoTerkini(e, l.tokoId, l.namaToko),
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       _Baris('Pendapatan', formatRupiah(l.pendapatan)),
       _Baris('Tip', formatRupiah(l.tip)),
       _Baris('HPP (modal terjual)', '-${formatRupiah(l.hpp)}'),
