@@ -90,22 +90,25 @@ void main() {
       expect(e.tawarOrmas(toko1), HasilOrmas.tawarDitolak);
       expect(e.toko(toko1).ormas!.kemarahan, closeTo(30, 1e-9));
       expect(e.tawarOrmas(toko1), HasilOrmas.tidakBisa);
-      r.atur([0.9]);
-      expect(e.panggilPakRt(toko1), HasilOrmas.rtGagal);
-      expect(e.toko(toko1).ormas!.kemarahan, closeTo(55, 1e-9));
-      expect(e.panggilPakRt(toko1), HasilOrmas.tidakBisa);
-      e.bayarOrmas(toko1);
+      // Pak RT vs Ormas Rasa Jeruk: tanpa undian, selalu mengusir.
+      expect(e.laporPakRT(toko1), HasilOrmas.rtDatang);
+      expect(e.laporPakRT(toko1), HasilOrmas.tidakBisa);
+      expect(e.bayarOrmas(toko1), HasilOrmas.tidakBisa); // fase Pak RT
+      e.tick(3.5);
+      expect(e.toko(toko1).ormas, isNull);
+      expect(e.uang, 180000); // tanpa bayar
 
       e.munculkanOrmas(toko1);
       r.atur([0.1]);
       expect(e.tawarOrmas(toko1), HasilOrmas.tawarDiterima);
       e.munculkanOrmas(toko1);
-      r.atur([0.1]);
-      expect(e.panggilPakRt(toko1), HasilOrmas.rtBerhasil);
-      expect(e.uang, 200000 - 20000 - 20000 - 10000);
+      e.bayarOrmas(toko1);
+      expect(e.uang, 200000 - 20000 - 10000 - 20000);
 
       e.tick(e.sisaDetikHari);
-      expect(e.laporanTerakhir!.toko.single.jatahOrmas, 50000);
+      final l = e.laporanTerakhir!.toko.single;
+      expect(l.jatahOrmas, 50000);
+      expect(l.setoranPemalak, {JenisPemalak.jeruk: 50000});
     });
 
     test('jadwal acak: hari >= 3, jam 10:00', () {

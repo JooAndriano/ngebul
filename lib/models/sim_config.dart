@@ -42,40 +42,96 @@ class EkspansiConfig {
   int get levelMaks => biayaPerLevel.length;
 }
 
-/// Kunjungan ormas (troll) fiktif.
+/// Satu jenis pemalak (fiktif, plesetan generik). Semua angka per jenis.
+class PemalakConfig {
+  const PemalakConfig({
+    required this.jenis,
+    required this.nama,
+    required this.emoji,
+    required this.bobot,
+    required this.kemarahanPerDetik,
+    required this.persenJatah,
+    required this.jatahMin,
+    required this.jatahMaks,
+    required this.bisaDiusirPakRT,
+  });
+
+  final JenisPemalak jenis;
+  final String nama;
+
+  /// Placeholder visual (diganti sprite nanti).
+  final String emoji;
+
+  /// Bobot undian jenis saat kunjungan dijadwalkan.
+  final double bobot;
+
+  /// Kenaikan kemarahan per detik simulasi selama diabaikan.
+  final double kemarahanPerDetik;
+
+  /// Jatah = clamp(persen x pendapatanKemarin, min, maks), dibulatkan.
+  final double persenJatah;
+  final double jatahMin;
+  final double jatahMaks;
+
+  /// Lapor Pak RT berhasil mengusir jenis ini.
+  final bool bisaDiusirPakRT;
+}
+
+/// Aksi "Lapor Pak RT". Fase Pak RT berjalan dalam waktu game agar engine
+/// dan animasi selalu konsisten.
+class PakRTConfig {
+  const PakRTConfig({
+    required this.durasiDatang,
+    required this.durasiFase,
+    required this.biaya,
+    required this.jeda,
+  });
+
+  /// Detik sejak dipanggil sampai Pak RT tiba dan berseru.
+  final double durasiDatang;
+
+  /// Lama fase Pak RT; di akhir fase hasilnya diterapkan.
+  final double durasiFase;
+
+  /// Biaya sekali lapor (0 = gratis).
+  final double biaya;
+
+  /// Jeda (detik game) sebelum bisa lapor lagi di toko yang sama
+  /// (0 = tanpa jeda). Tetap maksimal sekali per kunjungan.
+  final double jeda;
+}
+
+/// Kunjungan pemalak (troll) fiktif. Angka bersama; angka per jenis di
+/// [jenis].
 class OrmasConfig {
   const OrmasConfig({
-    required this.nama,
-    required this.namaSingkat,
-    required this.emoji,
+    required this.jenis,
+    required this.pakRT,
     required this.hariMulai,
     required this.peluangPerHariUtama,
     required this.peluangPerHariCabang,
     required this.tundaJikaAdaOrmasLain,
     required this.jamMunculMin,
     required this.jamMunculMaks,
-    required this.persenJatah,
-    required this.jatahMin,
-    required this.jatahMaks,
     required this.pembulatanJatah,
     required this.faktorKedatangan,
     required this.kemarahanMaks,
-    required this.kemarahanPerDetik,
     required this.ambangPeringatan,
     required this.porsiTawar,
     required this.peluangTawarDiterima,
     required this.kemarahanTawarDitolak,
-    required this.peluangRtBerhasil,
-    required this.kemarahanRtGagal,
     required this.reputasiSegel,
     required this.pengaliWaktuSaatDisegel,
     required this.dendaKaliJatah,
     required this.dendaMinimal,
   });
 
-  final String nama;
-  final String namaSingkat;
-  final String emoji;
+  /// Konfigurasi per jenis pemalak (urutan = urutan enum).
+  final List<PemalakConfig> jenis;
+  final PakRTConfig pakRT;
+
+  PemalakConfig pemalak(JenisPemalak j) =>
+      jenis.firstWhere((p) => p.jenis == j);
 
   final int hariMulai;
 
@@ -89,19 +145,13 @@ class OrmasConfig {
   final double jamMunculMin;
   final double jamMunculMaks;
 
-  /// Jatah = clamp(persen x pendapatanKemarin, min, maks), dibulatkan.
-  final double persenJatah;
-  final double jatahMin;
-  final double jatahMaks;
+  /// Pembulatan jatah (semua jenis).
   final double pembulatanJatah;
 
-  /// Pengali kedatangan pelanggan selama ormas hadir.
+  /// Pengali kedatangan pelanggan selama pemalak hadir.
   final double faktorKedatangan;
 
   final double kemarahanMaks;
-
-  /// Kenaikan kemarahan per detik simulasi selama diabaikan.
-  final double kemarahanPerDetik;
 
   /// Ambang peringatan visual bertahap, urut naik (mis. [50, 80]).
   final List<double> ambangPeringatan;
@@ -109,8 +159,6 @@ class OrmasConfig {
   final double porsiTawar;
   final double peluangTawarDiterima;
   final double kemarahanTawarDitolak;
-  final double peluangRtBerhasil;
-  final double kemarahanRtGagal;
 
   final double reputasiSegel;
 
@@ -176,7 +224,8 @@ class PesanConfig {
 class RatingConfig {
   const RatingConfig({
     required this.rating,
-    required this.ambangMin,
+    required this.maksDetik,
+    required this.maksDetikPerUnit,
     required this.persenTip,
     required this.reputasi,
     required this.emoji,
@@ -185,8 +234,11 @@ class RatingConfig {
 
   final RatingKecepatan rating;
 
-  /// Rating berlaku jika sisaKesabaran/total >= ambangMin.
-  final double ambangMin;
+  /// Rating berlaku jika lama menunggu di fase layani (detik) <=
+  /// maksDetik x skalaKesabaran(tipe) + maksDetikPerUnit x totalUnit.
+  /// Rating terakhir memakai double.infinity.
+  final double maksDetik;
+  final double maksDetikPerUnit;
   final double persenTip;
   final double reputasi;
   final String emoji;

@@ -5,7 +5,8 @@
 // - engine_toko.dart   : stok, harga, combo, buka kategori/item, ekspansi
 // - engine_usaha.dart  : buka cabang, kasir (rekrut, gaji)
 // - engine_layani.dart : pick & pack, proses kasir
-// - engine_ormas.dart  : ormas, segel, tebus
+// - engine_ormas.dart  : ormas (pemalak), segel, tebus
+// - engine_pemalak.dart: jenis pemalak, Lapor Pak RT
 // - engine_alert.dart  : alert, ucapan komik, efek komik
 // - engine_pesan.dart  : pesan SMS
 library;
@@ -31,6 +32,7 @@ import 'rumus_sim.dart';
 part 'engine_alert.dart';
 part 'engine_layani.dart';
 part 'engine_ormas.dart';
+part 'engine_pemalak.dart';
 part 'engine_pesan.dart';
 part 'engine_toko.dart';
 part 'engine_usaha.dart';
@@ -46,6 +48,7 @@ class SimulationEngine {
     math.Random? randomUcapan,
     this.kedatanganOtomatis = true,
     this.jadwalAcakHarian = true,
+    this.jenisPemalakPaksa,
   }) : config = config ?? simConfigDefault,
        _random = random ?? math.Random(),
        _randomUcapan = randomUcapan ?? math.Random() {
@@ -76,6 +79,9 @@ class SimulationEngine {
   /// False di unit test agar ormas & pesan keluarga tidak dijadwalkan acak.
   final bool jadwalAcakHarian;
 
+  /// Test/debug: semua kunjungan memakai jenis ini (tanpa undian).
+  final JenisPemalak? jenisPemalakPaksa;
+
   late final GameState _s;
   int _idPelanggan = 0;
 
@@ -95,6 +101,10 @@ class SimulationEngine {
   int _idUcapan = 0;
   final List<EfekKomik> _efek = [];
   int _idEfek = 0;
+
+  // Hasil Pak RT (lihat engine_pemalak.dart).
+  final List<HasilPakRT> _hasilPakRT = [];
+  int _idHasilPakRT = 0;
 
   static const _maksKejadian = 4;
 
@@ -293,6 +303,7 @@ class SimulationEngine {
           t.jadwalOrmas = _detikDariJam(
             _acakAntara(o.jamMunculMin, o.jamMunculMaks),
           );
+          t.jenisJadwalOrmas = _undiJenisPemalak();
         }
       }
       final p = config.pesan;
@@ -311,6 +322,8 @@ class SimulationEngine {
     t.kejadian.clear();
     t.ormas = null;
     t.jadwalOrmas = null;
+    t.jenisJadwalOrmas = null;
+    t.pakRTJedaSampai = 0;
     t.ormasDatangHariIni = false;
     t.kenaSegelHariIni = false;
     t.ditebusHariIni = false;
@@ -377,9 +390,15 @@ class SimulationEngine {
     if (t.jadwalOrmas != null && _s.waktu >= t.jadwalOrmas!) {
       _jalankanJadwalOrmas(t);
     }
-    if (t.ormas != null) {
-      _tambahKemarahan(t, config.ormas.kemarahanPerDetik * dt);
-      if (!t.buka) return; // tersegel
+    final o = t.ormas;
+    if (o != null) {
+      if (o.sedangPakRT) {
+        // Fase Pak RT: kemarahan berhenti naik.
+        _langkahPakRT(t, dt);
+      } else {
+        _tambahKemarahan(t, konfigPemalak(o.jenis).kemarahanPerDetik * dt);
+        if (!t.buka) return; // tersegel
+      }
     }
 
     // Kasir (tidak bekerja saat toko disegel).
@@ -427,6 +446,10 @@ class SimulationEngine {
   }
 
   void _akhiriHari() {
+    // Fase Pak RT yang masih berjalan: hasilnya diterapkan sekarang.
+    for (final t in _s.tokos) {
+      _selesaikanPakRT(t);
+    }
     for (final t in _s.tokos) {
       // Pelanggan yang masih antre pulang (tidak dihitung hilang).
       for (final antre in t.antrean.values) {
@@ -458,6 +481,7 @@ class SimulationEngine {
       t.laporanTerakhir = laporan.firstWhere((l) => l.tokoId == t.id);
       // Hari disegel penuh sudah dijalani: segel selesai.
       if (t.disegelPenuhHariIni) t.segelAktif = false;
+      if (!t.segelAktif) t.penyegel = null;
       // Statistik direset sekarang, jadi transaksi di antara dua hari
       // masuk ke hari berikutnya.
       t.stat = StatistikHarian();
@@ -500,6 +524,8 @@ class SimulationEngine {
       gajiKasir: s.gajiKasir,
       kasirLevel: t.kasirLevel,
       jatahOrmas: s.jatahOrmas,
+      setoranPemalak: Map.unmodifiable(s.setoranPemalak),
+      penyegel: status == StatusSegel.tidak ? null : t.penyegel,
       dendaSegel: s.denda,
       dilayani: s.dilayani,
       dilayaniKasir: s.dilayaniKasir,

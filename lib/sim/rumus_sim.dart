@@ -156,13 +156,43 @@ abstract final class RumusSim {
       c.kesabaranLayani * skalaKesabaran(c, dasar) +
       c.kesabaranPerUnit * math.max(0, totalUnit - 1);
 
-  /// Rating dari sisa kesabaran (pecahan 0..1).
-  static RatingConfig rating(SimConfig c, double fraksiKesabaran) {
+  /// Batas detik menunggu untuk rating [r]:
+  /// maksDetik x skala tipe + maksDetikPerUnit x total unit.
+  static double batasRating(
+    SimConfig c,
+    RatingConfig r, {
+    required double kesabaranDasar,
+    required int totalUnit,
+  }) =>
+      r.maksDetik * skalaKesabaran(c, kesabaranDasar) +
+      r.maksDetikPerUnit * totalUnit;
+
+  /// Rating dari lama menunggu di fase layani (detik absolut).
+  static RatingConfig rating(
+    SimConfig c,
+    double detikMenunggu, {
+    required double kesabaranDasar,
+    required int totalUnit,
+  }) {
     for (final r in c.rating) {
-      if (fraksiKesabaran >= r.ambangMin) return r;
+      final batas = batasRating(
+        c,
+        r,
+        kesabaranDasar: kesabaranDasar,
+        totalUnit: totalUnit,
+      );
+      if (detikMenunggu <= batas) return r;
     }
     return c.rating.last;
   }
+
+  /// Rating pelanggan [p] saat ini.
+  static RatingConfig ratingPelanggan(SimConfig c, Pelanggan p) => rating(
+    c,
+    p.detikMenunggu,
+    kesabaranDasar: p.tipe.kesabaranDasar,
+    totalUnit: p.pesanan.totalUnit,
+  );
 
   static RatingConfig ratingConfig(SimConfig c, RatingKecepatan r) =>
       c.rating.firstWhere((x) => x.rating == r);
@@ -194,16 +224,24 @@ abstract final class RumusSim {
 
   // --------------------------------------------------------------- Ormas
 
-  /// Jatah = clamp(10% x pendapatanKemarin, 20.000, 150.000), dibulatkan
-  /// ke 5.000. Tanpa data kemarin: jatah minimal.
-  static double jatahOrmas(SimConfig c, double? pendapatanKemarin) {
-    final o = c.ormas;
-    if (pendapatanKemarin == null) return o.jatahMin;
-    final mentah = (o.persenJatah * pendapatanKemarin).clamp(
-      o.jatahMin,
-      o.jatahMaks,
+  /// Jatah = clamp(persen x pendapatanKemarin, min, maks) per jenis,
+  /// dibulatkan ke 5.000. Tanpa data kemarin: jatah minimal.
+  /// (Jeruk: 10%, 20.000..150.000.)
+  static double jatahOrmas(
+    SimConfig c,
+    double? pendapatanKemarin, [
+    JenisPemalak jenis = JenisPemalak.jeruk,
+  ]) {
+    final p = c.ormas.pemalak(jenis);
+    if (pendapatanKemarin == null) return p.jatahMin;
+    final mentah = (p.persenJatah * pendapatanKemarin).clamp(
+      p.jatahMin,
+      p.jatahMaks,
     );
-    return bulatkan(mentah, o.pembulatanJatah).clamp(o.jatahMin, o.jatahMaks);
+    return bulatkan(
+      mentah,
+      c.ormas.pembulatanJatah,
+    ).clamp(p.jatahMin, p.jatahMaks);
   }
 
   /// Denda tebus segel = max(3 x jatah terakhir, 100.000).

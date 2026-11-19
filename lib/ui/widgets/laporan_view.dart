@@ -7,6 +7,30 @@ import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
 import 'ui_helper.dart';
 
+/// Baris setoran pemalak: per jenis jika ada, selain itu total 0.
+List<Widget> _barisSetoran(
+  SimulationEngine e,
+  Map<JenisPemalak, double> per,
+  double total,
+) => [
+  if (per.isEmpty)
+    _Baris('Setoran pemalak', '-${formatRupiah(total)}')
+  else
+    for (final x in per.entries)
+      _Baris('Setoran ${e.namaPemalak(x.key)}', '-${formatRupiah(x.value)}'),
+];
+
+/// "Disegel Si Coklat" / "Disegel seharian (Petugas Pajek)".
+String labelStatusSegel(SimulationEngine e, LaporanToko l) {
+  final p = l.penyegel;
+  if (p == null) return l.statusSegel.label;
+  return switch (l.statusSegel) {
+    StatusSegel.kenaSegel => 'Disegel ${e.namaPemalak(p)}',
+    StatusSegel.disegelPenuh => 'Disegel seharian (${e.namaPemalak(p)})',
+    _ => l.statusSegel.label,
+  };
+}
+
 /// Isi laporan harian; dipakai di panel Warung dan dialog akhir hari.
 /// Multi-toko: tab per toko + ringkasan gabungan.
 class LaporanView extends StatefulWidget {
@@ -89,6 +113,10 @@ class _LaporanViewState extends State<LaporanView> {
     );
   }
 
+  /// Setoran ke [j] dijumlah semua toko.
+  double _setoran(LaporanHarian l, JenisPemalak j) =>
+      l.toko.fold(0, (a, t) => a + (t.setoranPemalak[j] ?? 0));
+
   Color _warnaUntung(ThemeData theme, double untung) =>
       untung < 0 ? theme.colorScheme.error : Colors.green;
 
@@ -98,7 +126,13 @@ class _LaporanViewState extends State<LaporanView> {
     _Baris('HPP (modal terjual)', '-${formatRupiah(l.hpp)}'),
     _Baris('Sewa lapak', '-${formatRupiah(l.sewa)}'),
     _Baris('Gaji kasir', '-${formatRupiah(l.gajiKasir)}'),
-    _Baris('Jatah ormas', '-${formatRupiah(l.jatahOrmas)}'),
+    ..._barisSetoran(
+      widget.engine,
+      {
+        for (final t in l.toko) ...t.setoranPemalak,
+      }.map((k, _) => MapEntry(k, _setoran(l, k))),
+      l.jatahOrmas,
+    ),
     if (l.dendaSegel > 0)
       _Baris('Denda tebus segel', '-${formatRupiah(l.dendaSegel)}'),
     const Divider(),
@@ -116,7 +150,7 @@ class _LaporanViewState extends State<LaporanView> {
     for (final t in l.toko)
       _Baris(
         '• ${namaTokoTerkini(widget.engine, t.tokoId, t.namaToko)} '
-        '(${t.statusSegel.label})',
+        '(${labelStatusSegel(widget.engine, t)})',
         formatRupiah(t.untungBersih),
         indent: 12,
         warna: _warnaUntung(theme, t.untungBersih),
@@ -140,7 +174,7 @@ class _LaporanViewState extends State<LaporanView> {
         l.kasirLevel > 0 ? 'Gaji kasir (Lv${l.kasirLevel})' : 'Gaji kasir',
         '-${formatRupiah(l.gajiKasir)}',
       ),
-      _Baris('Jatah ormas', '-${formatRupiah(l.jatahOrmas)}'),
+      ..._barisSetoran(e, l.setoranPemalak, l.jatahOrmas),
       if (l.dendaSegel > 0)
         _Baris('Denda tebus segel', '-${formatRupiah(l.dendaSegel)}'),
       const Divider(),
@@ -169,7 +203,7 @@ class _LaporanViewState extends State<LaporanView> {
       for (final a in AlasanPergi.values)
         _Baris('• ${a.label}', '${l.hilang[a] ?? 0}', indent: 12),
       _Baris('Perubahan reputasi', formatDelta(l.perubahanReputasi)),
-      _Baris('Status segel', l.statusSegel.label),
+      _Baris('Status segel', labelStatusSegel(e, l)),
       _Baris('Alert dikirim', '${l.alertDikirim}'),
     ];
   }

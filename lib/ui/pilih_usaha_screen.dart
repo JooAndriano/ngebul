@@ -17,6 +17,9 @@ class PilihUsahaScreen extends ConsumerWidget {
     final katalog = simConfigDefault.katalog.values.toList();
 
     return Scaffold(
+      // Keyboard (dialog nama) tidak boleh memampatkan layar di belakangnya;
+      // dialog sendiri yang menghindari keyboard.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),

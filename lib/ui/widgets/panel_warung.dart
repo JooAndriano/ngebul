@@ -167,7 +167,8 @@ class _BarisToko extends StatelessWidget {
     final status = toko.kondisiSegel
         ? '${TampilanData.emojiSegel} disegel'
         : toko.ormas != null
-        ? '${engine.config.ormas.emoji} ada ormas'
+        ? '${engine.konfigPemalak(toko.ormas!.jenis).emoji} ada '
+              '${engine.namaPemalak(toko.ormas!.jenis)}'
         : 'buka';
     final kasir = toko.kasirLevel > 0
         ? 'kasir Lv${toko.kasirLevel}'

@@ -11,15 +11,18 @@ const toko1 = 'toko1';
 
 /// Engine deterministik: tanpa kedatangan otomatis dan tanpa jadwal acak
 /// harian. FakeRandom bawaan 0: pelanggan pasti beli (jika peluang > 0),
-/// antrean seri -> kiri.
+/// antrean seri -> kiri. Semua kunjungan pemalak memakai [pemalak]
+/// (default Ormas Rasa Jeruk = angka "ormas" lama); null = diundi.
 SimulationEngine buatEngine({
   JenisUsaha jenis = JenisUsaha.makanan,
   FakeRandom? random,
+  JenisPemalak? pemalak = JenisPemalak.jeruk,
 }) => SimulationEngine(
   jenisUsaha: jenis,
   random: random ?? FakeRandom(),
   kedatanganOtomatis: false,
   jadwalAcakHarian: false,
+  jenisPemalakPaksa: pemalak,
 );
 
 TipePelangganData tipe(String id) => simConfigDefault.tipeById(id);

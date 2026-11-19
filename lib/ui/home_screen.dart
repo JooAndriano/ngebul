@@ -7,15 +7,18 @@ import '../data/ucapan_data.dart';
 import '../models/sim_types.dart';
 import '../sim/sim_controller.dart';
 import '../sim/simulation_engine.dart';
+import 'flame/lapisan_warung.dart';
 import 'flame/warung_game_view.dart';
 import 'notif/notif_model.dart';
 import 'notif/notif_service.dart';
 import 'widgets/banner_ormas.dart';
+import 'widgets/baris_kejadian.dart';
 import 'widgets/floating_text.dart';
 import 'widgets/gelembung_komik.dart';
 import 'widgets/hud.dart';
 import 'widgets/ikon_tepi.dart';
 import 'widgets/laporan_view.dart';
+import 'widgets/notif_pemalak.dart';
 import 'widgets/overlay_segel.dart';
 import 'widgets/panel_layani.dart';
 import 'widgets/panel_samping.dart';
@@ -79,8 +82,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final emoji = olehKasir
         ? TampilanData.emojiAvatarKasir
         : switch (a.jenis) {
-            JenisAlert.ormasHadir ||
-            JenisAlert.ormasMarah80 => e.config.ormas.emoji,
+            JenisAlert.ormasHadir || JenisAlert.ormasMarah80 =>
+              e.konfigPemalak(a.pemalak ?? JenisPemalak.jeruk).emoji,
             JenisAlert.segel => TampilanData.emojiSegel,
             _ => TampilanData.emojiAlertSistem,
           };
@@ -181,6 +184,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
     );
 
+    // Hasil Pak RT (akhir fasenya) -> toast.
+    ref.listen<int>(
+      simControllerProvider.select(
+        (v) => v.engineAtauNull?.hasilPakRT.lastOrNull?.id ?? 0,
+      ),
+      (sebelum, sekarang) {
+        final e = ref.read(simControllerProvider).engineAtauNull;
+        if (e == null) return;
+        for (final h in e.hasilPakRT) {
+          if (h.id > (sebelum ?? 0)) kabariHasilPakRT(_notif, e, h);
+        }
+      },
+    );
+
     // Efek komik baru di toko fokus -> tulisan melayang.
     ref.listen<int>(
       simControllerProvider.select((v) {
@@ -207,6 +224,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
+      // Keyboard (dialog ubah nama / nama cabang) tidak boleh memampatkan
+      // scene & panel; dialog sendiri yang menghindari keyboard.
+      resizeToAvoidBottomInset: false,
       endDrawer: PanelSamping(panel: v.panel, lebar: _lebarPanel),
       onEndDrawerChanged: (terbuka) {
         _notif.insetKanan = terbuka ? _lebarPanel : 0;
@@ -215,36 +235,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Stage 2: scene Flame paling bawah, SceneWarung jadi lapisan
-            // interaksi (tap, balon, ucapan, kasir, ormas) di atasnya.
-            if (sceneFlame)
+            // Stage 2: scene Flame (pelanggan, pemalak, Pak RT, kasir,
+            // segel) + lapisan tombol (bubble memalak, tebus segel).
+            // Scene lama (SceneWarung, OverlaySegel, BannerOrmas) hanya
+            // jika flag pakaiSceneFlame dimatikan.
+            if (sceneFlame) ...[
               const Positioned.fill(
                 top: Hud.tinggi,
                 right: IkonTepi.lebar,
                 child: WarungGameView(),
               ),
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  top: Hud.tinggi,
-                  right: IkonTepi.lebar,
+              Positioned(
+                top: Hud.tinggi + 8,
+                left: 8,
+                right: IkonTepi.lebar + 8,
+                child: IgnorePointer(
+                  child: BarisKejadian(
+                    engine: v.engine,
+                    toko: t,
+                    berlatar: true,
+                  ),
                 ),
-                child: SceneWarung(modeLapisan: sceneFlame),
               ),
-            ),
-            if (t.disegelPenuhHariIni)
               const Positioned.fill(
                 top: Hud.tinggi,
                 right: IkonTepi.lebar,
-                child: OverlaySegel(),
+                child: LapisanWarung(),
               ),
-            if (t.ormas != null)
-              const Positioned(
-                left: 8,
-                right: IkonTepi.lebar + 4,
-                bottom: 4,
-                child: BannerOrmas(),
+            ] else ...[
+              const Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: Hud.tinggi,
+                    right: IkonTepi.lebar,
+                  ),
+                  child: SceneWarung(),
+                ),
               ),
+              if (t.disegelPenuhHariIni)
+                const Positioned.fill(
+                  top: Hud.tinggi,
+                  right: IkonTepi.lebar,
+                  child: OverlaySegel(),
+                ),
+              if (t.ormas != null)
+                const Positioned(
+                  left: 8,
+                  right: IkonTepi.lebar + 4,
+                  bottom: 4,
+                  child: BannerOrmas(),
+                ),
+            ],
             if (t.sesiLayani != null)
               Positioned.fill(
                 top: Hud.tinggi,

@@ -1,4 +1,5 @@
 import '../models/sim_types.dart';
+import 'pemalak_data.dart';
 
 // Teks ucapan komik & alert. Teks dipilih acak oleh engine berdasarkan
 // (tipePelanggan, situasi). Nanti dipindah ke JSON / Remote Config.
@@ -81,58 +82,6 @@ abstract final class UcapanData {
     },
   };
 
-  static const Map<SituasiUcapan, List<String>> ormas = {
-    SituasiUcapan.ormasDatang: [
-      'Mana setoran?!',
-      'Jatah keamanan, Bos!',
-      'Uang kopi dong, Bos!',
-    ],
-    SituasiUcapan.ormasMarah50: [
-      'Jangan pura-pura nggak lihat!',
-      'Halo?! Kami nunggu nih!',
-      'Jangan bikin kesel ya!',
-    ],
-    SituasiUcapan.ormasMarah80: [
-      'Awas ya, saya segel nih!',
-      'Kesabaran kami habis!',
-      'Mau disegel, hah?!',
-    ],
-    SituasiUcapan.ormasSegel: ['SEGEL!!', 'SEGEL! TUTUP!', 'SEGEL!!!'],
-    SituasiUcapan.ormasBayar: [
-      'Nah gitu dong. Aman, aman.',
-      'Sip, aman terkendali.',
-      'Gitu dong, Bos. Aman.',
-    ],
-    SituasiUcapan.ormasTawarDiterima: [
-      'Ya udah, kali ini aja.',
-      'Hmm... oke deh.',
-      'Lain kali full ya!',
-    ],
-    SituasiUcapan.ormasTawarDitolak: [
-      'Setengah?! Yang bener aja!',
-      'Nawar?! Nggak bisa!',
-      'Mana cukup segitu!',
-    ],
-    SituasiUcapan.ormasPergiKarenaPakRT: [
-      'Eh, Pak RT... kami pamit.',
-      'Siap, Pak RT. Permisi...',
-      'Ampun, Pak RT...',
-    ],
-    SituasiUcapan.ormasPakRTGagal: [
-      'Pak RT jangan ikut campur!',
-      'Ini urusan kami, Pak!',
-      'Minggir, Pak RT!',
-    ],
-  };
-
-  static const Map<SituasiUcapan, List<String>> pakRT = {
-    SituasiUcapan.pakRT: [
-      'Sudah, sudah, bubar...',
-      'Ada apa ini? Bubar!',
-      'Jangan bikin ribut di sini!',
-    ],
-  };
-
   static const Map<SituasiUcapan, List<String>> kasir = {
     SituasiUcapan.kasirRekrut: [
       'Siap jaga {toko}, Bos!',
@@ -142,17 +91,23 @@ abstract final class UcapanData {
   };
 
   /// Pilihan teks untuk [sumber] + [situasi]; [tipeId] menambah gaya tipe.
+  /// Ucapan pemalak & Pak RT ada di pemalak_data.dart ([pemalak] = jenis
+  /// pemalak yang berbicara, default Ormas Rasa Jeruk).
   static List<String> pilihan(
     SumberUcapan sumber,
     SituasiUcapan situasi, {
     String? tipeId,
+    JenisPemalak? pemalak,
   }) => switch (sumber) {
     SumberUcapan.pelanggan => [
       ...?pelanggan[situasi],
       ...?perTipe[tipeId]?[situasi],
     ],
-    SumberUcapan.ormas => ormas[situasi] ?? const [],
-    SumberUcapan.pakRT => pakRT[situasi] ?? const [],
+    SumberUcapan.ormas => UcapanPemalakData.pilihan(
+      pemalak ?? JenisPemalak.jeruk,
+      situasi,
+    ),
+    SumberUcapan.pakRT => UcapanPemalakData.pakRT[situasi] ?? const [],
     SumberUcapan.kasir => kasir[situasi] ?? const [],
   };
 

@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/sim_config.dart';
 import '../../models/sim_types.dart';
 import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
@@ -59,6 +60,9 @@ class _WarungGameViewState extends ConsumerState<WarungGameView>
   TipePelangganData? tipe(String id) => _v.engineAtauNull?.config.tipePelanggan
       .where((t) => t.id == id)
       .firstOrNull;
+
+  @override
+  OrmasConfig? konfigOrmas() => _v.engineAtauNull?.config.ormas;
 
   /// Sama dengan tap pelanggan terdepan di scene lama.
   @override

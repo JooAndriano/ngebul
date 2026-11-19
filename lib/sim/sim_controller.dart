@@ -230,7 +230,9 @@ class SimController extends Notifier<SimView> {
   // Ormas & segel
   HasilOrmas bayarOrmas() => _aksi(() => _e.bayarOrmas(_tokoId));
   HasilOrmas tawarOrmas() => _aksi(() => _e.tawarOrmas(_tokoId));
-  HasilOrmas panggilPakRt() => _aksi(() => _e.panggilPakRt(_tokoId));
+
+  /// Lapor Pak RT di toko fokus (sekali per kunjungan).
+  HasilOrmas laporPakRT() => _aksi(() => _e.laporPakRT(_tokoId));
   bool tebusSegel() => _aksi(() => _e.tebusSegel(_tokoId));
   bool tebusSegelToko(String tokoId) => _aksi(() => _e.tebusSegel(tokoId));
 
@@ -248,7 +250,10 @@ class SimController extends Notifier<SimView> {
       _aksi(() => _e.setKasirOtomatis(_tokoId, aktif));
   void debugTambahUang(double jumlah) =>
       _aksi(() => _e.debugTambahUang(jumlah));
-  bool munculkanOrmas() => _aksi(() => _e.munculkanOrmas(_tokoId));
+
+  /// [jenis] null = diundi berbobot.
+  bool munculkanOrmas({JenisPemalak? jenis}) =>
+      _aksi(() => _e.munculkanOrmas(_tokoId, jenis: jenis));
   void kirimAlertUji() => _aksi(() => _e.kirimAlertUji(_tokoId));
   void kirimPesanKeluarga() => _aksi(_e.kirimPesanKeluarga);
   void kirimInfoHargaPokok() => _aksi(_e.kirimInfoHargaPokok);

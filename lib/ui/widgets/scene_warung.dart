@@ -7,8 +7,8 @@ import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import 'baris_kejadian.dart';
 import 'gelembung_komik.dart';
-import 'ui_helper.dart';
 
 /// Scene placeholder tampak depan: antrean kiri | warung | antrean kanan.
 /// Pelanggan terdepan berada paling dekat warung.
@@ -39,7 +39,7 @@ class SceneWarung extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 72),
           child: Column(
             children: [
-              _BarisKejadian(engine: e, toko: t, berlatar: true),
+              BarisKejadian(engine: e, toko: t, berlatar: true),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -97,7 +97,7 @@ class SceneWarung extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 72),
         child: Column(
           children: [
-            _BarisKejadian(engine: e, toko: t),
+            BarisKejadian(engine: e, toko: t),
             Expanded(
               child: Stack(
                 children: [
@@ -141,57 +141,6 @@ class SceneWarung extends ConsumerWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BarisKejadian extends StatelessWidget {
-  const _BarisKejadian({
-    required this.engine,
-    required this.toko,
-    this.berlatar = false,
-  });
-  final SimulationEngine engine;
-  final Toko toko;
-
-  /// Di atas langit Flame: teks diberi latar kecil agar terbaca.
-  final bool berlatar;
-
-  @override
-  Widget build(BuildContext context) {
-    final k = toko.kejadian.isEmpty ? null : toko.kejadian.first;
-    var teks = ' ';
-    if (k != null) {
-      final siapa = '${k.tipe.emoji} ${k.tipe.nama}';
-      if (k.alasanPergi != null) {
-        teks = '$siapa pergi: ${k.alasanPergi!.label}';
-      } else {
-        teks =
-            '$siapa belanja ${formatRupiah(k.pendapatan)}'
-            '${k.rating != null ? ' ${labelRating(engine, k.rating!)}' : ''}';
-      }
-    }
-    final theme = Theme.of(context);
-    final teksWidget = Text(
-      teks,
-      style: theme.textTheme.bodySmall,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-    if (!berlatar) return teksWidget;
-    if (k == null) return const SizedBox(height: 18);
-    return Align(
-      alignment: Alignment.topLeft,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: teksWidget,
         ),
       ),
     );
@@ -268,7 +217,15 @@ class _BlokWarung extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _FigurOrmas(engine: engine, toko: toko, ucapan: teksOrmas),
+              _FigurOrmas(
+                engine: engine,
+                toko: toko,
+                ucapan: teksOrmas,
+                jenisUcapan: ucapan
+                    .where((u) => u.sumber == SumberUcapan.ormas)
+                    .lastOrNull
+                    ?.pemalak,
+              ),
               if (teksRt != null) ...[
                 const SizedBox(width: 8),
                 DenganGelembung(
@@ -328,18 +285,25 @@ class _FigurOrmas extends StatelessWidget {
     required this.engine,
     required this.toko,
     required this.ucapan,
+    this.jenisUcapan,
   });
   final SimulationEngine engine;
   final Toko toko;
   final String? ucapan;
+  final JenisPemalak? jenisUcapan;
 
   @override
   Widget build(BuildContext context) {
     final o = toko.ormas;
     final c = engine.config.ormas;
+    // Pemalak sudah pergi: pakai jenis dari ucapan terakhirnya.
+    final jenis = o?.jenis ?? jenisUcapan ?? JenisPemalak.jeruk;
     final figur = DenganGelembung(
       teks: ucapan,
-      child: Text(c.emoji, style: const TextStyle(fontSize: 30)),
+      child: Text(
+        engine.konfigPemalak(jenis).emoji,
+        style: const TextStyle(fontSize: 30),
+      ),
     );
     // Ormas sudah pergi, ucapan terakhirnya masih tampil.
     if (o == null) {

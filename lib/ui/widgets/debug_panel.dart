@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
+import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
 
@@ -53,15 +54,19 @@ class DebugPanel extends ConsumerWidget {
               onPressed: () => c.debugTambahUang(DebugData.tambahUang),
               child: Text('+${formatRupiah(DebugData.tambahUang)}'),
             ),
-            OutlinedButton(
-              onPressed: !e.adaOrmasAktif && t.buka && !e.hariSelesai
-                  ? () {
-                      c.munculkanOrmas();
-                      tutup();
-                    }
-                  : null,
-              child: const Text('Munculkan ormas (toko fokus)'),
-            ),
+            for (final j in JenisPemalak.values)
+              OutlinedButton(
+                onPressed: !e.adaOrmasAktif && t.buka && !e.hariSelesai
+                    ? () {
+                        c.munculkanOrmas(jenis: j);
+                        tutup();
+                      }
+                    : null,
+                child: Text(
+                  'Munculkan ${e.konfigPemalak(j).emoji} '
+                  '${e.namaPemalak(j)}',
+                ),
+              ),
             OutlinedButton(
               onPressed: () {
                 c.kirimAlertUji();

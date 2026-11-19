@@ -3,6 +3,7 @@ import 'package:flame/events.dart';
 import 'package:flame_test/flame_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngebul/models/sim_config.dart';
 import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/models/tipe_pelanggan_data.dart';
 import 'package:ngebul/models/toko.dart';
@@ -32,6 +33,9 @@ class _Sumber implements SumberScene {
   @override
   TipePelangganData? tipe(String id) =>
       e.config.tipePelanggan.where((t) => t.id == id).firstOrNull;
+
+  @override
+  OrmasConfig? konfigOrmas() => e.config.ormas;
 
   @override
   void ketukPelanggan(Sisi sisi) {
@@ -224,6 +228,149 @@ void main() {
       expect(w.fase, FasePelanggan.diprosesKasir);
       expect(w.bubbleTampil, JenisBubble.kasir);
       expect(w.bisaDiketukSekarang, isFalse);
+    },
+  );
+
+  // ------------------------------------------------ Stage 2d: pemalak dkk.
+
+  WarungGame Function() gameDengan(JenisPemalak j) => () {
+    e = buatEngine(pemalak: j);
+    sumber = _Sumber(e);
+    return WarungGame(sumber: sumber);
+  };
+
+  testWithGame<WarungGame>(
+    'pemalak masuk ke pojok kiri bawah, makin marah, pergi saat dibayar',
+    buatGame,
+    (g) async {
+      await siap(g);
+      expect(g.pemalak, isNull);
+      e.munculkanOrmas(toko1);
+      await jalan(g, 0.05);
+      final p = g.pemalak!;
+      expect(p.jenis, JenisPemalak.jeruk);
+      expect(p.sudahDiam, isFalse); // animasi masuk dari kiri
+      expect(p.position.x, lessThan(g.tata.xPemalak));
+      await jalan(g, 0.7);
+      expect(p.sudahDiam, isTrue);
+      expect(p.position.x, closeTo(g.tata.xPemalak, 0.01));
+      expect(p.position.y, closeTo(g.tata.yKakiPemalak, 0.01));
+      expect(p.size.y, closeTo(300 * 0.38, 0.01)); // 38% tinggi layar
+      expect(p.ucapanTampil, isNull); // kalimat ada di bubble overlay
+      expect(p.tingkatMarah, 0);
+      e.tick(49);
+      await jalan(g, 0.05);
+      expect(p.tingkatMarah, 2);
+
+      e.bayarOrmas(toko1);
+      await jalan(g, 0.05);
+      expect(p.sedangKeluar, isTrue);
+      expect(p.ucapanTampil, isNotNull); // "Nah, manis kan jadinya."
+      await jalan(g, 1);
+      expect(g.pemalak, isNull);
+    },
+  );
+
+  testWithGame<WarungGame>(
+    'Pak RT vs Jeruk: datang dari kanan, usir, pemalak lari ke kiri',
+    buatGame,
+    (g) async {
+      await siap(g);
+      e.munculkanOrmas(toko1);
+      await jalan(g, 0.7);
+      e.laporPakRT(toko1);
+      await jalan(g, 0.02);
+      final rt = g.pakRT!;
+      expect(rt.position.x, closeTo(g.tata.xTepiKananPakRT, 0.01));
+      e.tick(0.75); // setengah durasiDatang
+      await jalan(g, 0.02);
+      final tengah = (g.tata.xTepiKananPakRT + g.tata.xBerhentiPakRT) / 2;
+      expect(rt.position.x, closeTo(tengah, 2));
+      e.tick(0.8);
+      await jalan(g, 0.02);
+      expect(rt.position.x, closeTo(g.tata.xBerhentiPakRT, 0.01));
+      expect(rt.ucapanTampil, isNotNull); // "Bubar! Bubar!"
+      expect(rt.hadapKanan, isFalse);
+
+      e.tick(2);
+      await jalan(g, 0.02);
+      expect(g.pemalak!.sedangKeluar, isTrue);
+      expect(rt.sedangKeluar, isTrue);
+      expect(rt.hadapKanan, isTrue);
+      await jalan(g, 6);
+      expect(g.pemalak, isNull);
+      expect(g.pakRT, isNull);
+    },
+  );
+
+  testWithGame<WarungGame>(
+    'Pak RT vs Pajek: gak sanggup, berbalik ke kanan; pemalak tetap',
+    gameDengan(JenisPemalak.pajek),
+    (g) async {
+      await siap(g);
+      e.munculkanOrmas(toko1);
+      await jalan(g, 0.7);
+      final p = g.pemalak!;
+      expect(p.jenis, JenisPemalak.pajek);
+      e.laporPakRT(toko1);
+      await jalan(g, 0.02);
+      final rt = g.pakRT!;
+      e.tick(1.6);
+      await jalan(g, 0.02);
+      expect(rt.ucapanTampil, isNotNull); // "Gak sanggup, bos..."
+      e.tick(2);
+      await jalan(g, 0.1);
+      expect(rt.sedangKeluar, isTrue);
+      expect(rt.hadapKanan, isTrue);
+      expect(rt.position.x, greaterThan(g.tata.xBerhentiPakRT));
+      expect(g.pemalak, same(p));
+      expect(p.sedangKeluar, isFalse);
+      await jalan(g, 6);
+      expect(g.pakRT, isNull);
+      expect(g.pemalak, same(p));
+    },
+  );
+
+  testWithGame<WarungGame>('kasir di meja dengan progres', buatGame, (g) async {
+    await siap(g);
+    expect(g.kasir, isNull);
+    e.setKasirOtomatis(toko1, true);
+    await jalan(g, 0.05);
+    final k = g.kasir!;
+    expect(k.position.x, closeTo(g.tata.xKasir, 0.01));
+    expect(k.position.y, closeTo(g.tata.yMeja, 0.01));
+    expect(k.progres, isNull);
+    datang(e, pesananItem({'es_teh': 1}));
+    e.tick(0.1); // mulai proses
+    e.tick(1);
+    await jalan(g, 0.02);
+    expect(k.progres, isNotNull);
+    expect(k.progres, greaterThan(0));
+    expect(k.progres, lessThan(1));
+    e.setKasirOtomatis(toko1, false);
+    await jalan(g, 0.02);
+    expect(g.kasir, isNull);
+  });
+
+  testWithGame<WarungGame>(
+    'segel: rolling door turun, naik saat ditebus',
+    buatGame,
+    (g) async {
+      await siap(g);
+      expect(g.segel.tutup, 0);
+      e.munculkanOrmas(toko1);
+      e.tick(61);
+      expect(e.toko(toko1).kondisiSegel, isTrue);
+      await jalan(g, 0.3);
+      expect(g.segel.aktif, isTrue);
+      expect(g.segel.tutup, inExclusiveRange(0, 1));
+      await jalan(g, 0.6);
+      expect(g.segel.tutup, 1);
+      e.mulaiHariBaru();
+      e.debugTambahUang(1e6);
+      e.tebusSegel(toko1);
+      await jalan(g, 1);
+      expect(g.segel.tutup, 0);
     },
   );
 }

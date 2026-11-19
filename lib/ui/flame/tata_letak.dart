@@ -53,4 +53,61 @@ class TataLetakScene {
   /// Titik muncul/hilang pelanggan: sedikit di luar layar.
   double tepiX(Sisi sisi) =>
       sisi == Sisi.kiri ? -ukuranPelanggan : lebar + ukuranPelanggan;
+
+  // ------------------------------------------------- Pemalak & Pak RT
+
+  /// Tinggi figur pemalak (pojok kiri bawah, di depan semua).
+  double get ukuranPemalak => tinggi * 0.38;
+
+  /// Kaki pemalak & Pak RT: dekat tepi bawah layar.
+  double get yKakiPemalak => tinggi * 0.99;
+
+  /// Pusat x pemalak saat berdiri.
+  double get xPemalak => ukuranPemalak * 0.6;
+
+  /// Titik keluar kiri pemalak (di luar layar).
+  double get xKeluarPemalak => -ukuranPemalak;
+
+  /// Puncak kepala pemalak (y).
+  double get yKepalaPemalak => yKakiPemalak - ukuranPemalak * 0.92;
+
+  double get ukuranPakRT => ukuranPemalak * 0.85;
+
+  /// Pak RT berhenti di kanan pemalak.
+  double get xBerhentiPakRT => xPemalak + ukuranPemalak * 0.85;
+
+  /// Pak RT masuk/keluar dari kanan layar.
+  double get xTepiKananPakRT => lebar + ukuranPakRT;
+
+  /// Batas atas area tap pelanggan (badan + bar + bubble pesanan). Bubble
+  /// memalak harus berada di atas garis ini agar tidak menghalangi tap.
+  double get yAtasPelanggan => yKaki - ukuranPelanggan * 1.75;
+
+  /// Batas bawah bubble memalak (y).
+  double get yBawahBubblePemalak =>
+      math.max(0, math.min(yKepalaPemalak, yAtasPelanggan) - 2);
+
+  /// Lebar maks bubble memalak.
+  double get lebarBubblePemalak => math.min(lebar - 16, 460);
+
+  // ------------------------------------------------------- Kasir & segel
+
+  /// Atas warung (y).
+  double get yAtasWarung => yTanah - tinggiWarung;
+
+  /// Permukaan meja warung (y): kaki kasir di sini.
+  double get yMeja => yAtasWarung + tinggiWarung * 0.78;
+
+  double get ukuranKasir => tinggiWarung * 0.34;
+
+  /// Kasir di sisi kanan bukaan etalase.
+  double get xKasir => pusatX + lebarWarung * 0.22;
+
+  /// Bukaan etalase (ditutup rolling door saat disegel).
+  ({double kiri, double atas, double lebar, double tinggi}) get bukaan => (
+    kiri: pusatX - lebarWarung * 0.4,
+    atas: yAtasWarung + tinggiWarung * 0.5,
+    lebar: lebarWarung * 0.8,
+    tinggi: tinggiWarung * 0.28,
+  );
 }

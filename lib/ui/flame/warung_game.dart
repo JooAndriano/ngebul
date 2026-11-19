@@ -4,12 +4,15 @@ import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/pemalak_data.dart';
+import '../../models/sim_config.dart';
 import '../../models/sim_types.dart';
 import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
 import 'fase_pelanggan.dart';
 import 'hiasan_pelanggan.dart';
 import 'pelanggan_walker.dart';
+import 'pemalak_komponen.dart';
 import 'tata_letak.dart';
 
 /// Penghubung scene Flame ke state engine. Scene hanya MEMBACA lewat ini,
@@ -25,6 +28,9 @@ abstract interface class SumberScene {
   Iterable<UcapanEvent> ucapanAktif();
 
   TipePelangganData? tipe(String id);
+
+  /// Konfigurasi pemalak & Pak RT (null = belum ada engine).
+  OrmasConfig? konfigOrmas();
 
   /// Pelanggan terdepan [sisi] diketuk: buka panel Layani.
   void ketukPelanggan(Sisi sisi);
@@ -60,6 +66,13 @@ class WarungGame extends FlameGame {
 
   TataLetakScene _tata = const TataLetakScene(0, 0);
 
+  // Pemalak, Pak RT, kasir, segel (lihat pemalak_komponen.dart).
+  PemalakKomponen? _pemalak;
+  KunjunganOrmas? _kunjungan;
+  PakRTKomponen? _pakRT;
+  KasirKomponen? _kasir;
+  final SegelKomponen _segel = SegelKomponen();
+
   /// Toko yang sedang ditampilkan. Dibandingkan per objek (bukan id) agar
   /// engine baru setelah "ulang pilih usaha" juga dianggap toko berbeda.
   Toko? _toko;
@@ -67,12 +80,21 @@ class WarungGame extends FlameGame {
 
   TataLetakScene get tata => _tata;
 
+  /// Untuk test.
+  PemalakKomponen? get pemalak =>
+      _pemalak == null || _pemalak!.isRemoved ? null : _pemalak;
+  PakRTKomponen? get pakRT =>
+      _pakRT == null || _pakRT!.isRemoved ? null : _pakRT;
+  KasirKomponen? get kasir => _kasir;
+  SegelKomponen get segel => _segel;
+
   @override
   Color backgroundColor() => const Color(0xFF8FD3F4);
 
   @override
   Future<void> onLoad() async {
     await add(_LatarWarung(this)..priority = -10);
+    await add(_segel);
   }
 
   @override
@@ -100,6 +122,13 @@ class WarungGame extends FlameGame {
     _statusTerakhir.clear();
     _melayang.clear();
     _ucapanDitangani.clear();
+    _pemalak?.removeFromParent();
+    _pakRT?.removeFromParent();
+    _kasir?.removeFromParent();
+    _pemalak = null;
+    _kunjungan = null;
+    _pakRT = null;
+    _kasir = null;
   }
 
   PelangganWalker _buatWalker(
@@ -155,6 +184,15 @@ class WarungGame extends FlameGame {
           kecepatan: _tata.kecepatan,
         );
       }
+      _pemalak?.atur(
+        ukuran: _tata.ukuranPemalak,
+        xDiam: _tata.xPemalak,
+        xKeluar: _tata.xKeluarPemalak,
+        yKaki: _tata.yKakiPemalak,
+      );
+      _pakRT
+        ?..aturUkuran(_tata.ukuranPakRT, _tata.yKakiPemalak)
+        ..kecepatan = _tata.kecepatan;
       _perluSnap = false;
     }
 
@@ -243,6 +281,117 @@ class WarungGame extends FlameGame {
       if (!masihAda.contains(id)) _melayang.remove(id)!.removeFromParent();
     }
     _ucapanDitangani.removeWhere((id) => !ucapan.any((u) => u.id == id));
+
+    _sinkronPemalak(t, snap);
+    _sinkronKasir(t);
+    _segel.atur(
+      aktif: t.kondisiSegel,
+      bukaan: Rect.fromLTWH(
+        _tata.bukaan.kiri,
+        _tata.bukaan.atas,
+        _tata.bukaan.lebar,
+        _tata.bukaan.tinggi,
+      ),
+      warung: Rect.fromLTWH(
+        _tata.pusatX - _tata.lebarWarung / 2,
+        _tata.yAtasWarung,
+        _tata.lebarWarung,
+        _tata.tinggiWarung,
+      ),
+      papan: TeksPemalakData.papanSegel,
+      langsung: ganti,
+    );
+  }
+
+  /// Ucapan aktif terakhir toko [t] dari [sumber] (non-pelanggan).
+  UcapanEvent? _ucapanDari(Toko t, SumberUcapan s) => sumber
+      .ucapanAktif()
+      .where((u) => u.tokoId == t.id && u.sumber == s)
+      .lastOrNull;
+
+  void _sinkronPemalak(Toko t, bool snap) {
+    final c = sumber.konfigOrmas();
+    final o = t.ormas;
+    if (_pemalak?.isRemoved ?? false) _pemalak = null;
+    if (_pakRT?.isRemoved ?? false) _pakRT = null;
+
+    if (o != null && c != null) {
+      final p = _pemalak;
+      if (p == null || p.sedangKeluar || !identical(_kunjungan, o)) {
+        p?.pergi();
+        _kunjungan = o;
+        _pemalak = PemalakKomponen(
+          jenis: o.jenis,
+          emoji: c.pemalak(o.jenis).emoji,
+          ukuran: _tata.ukuranPemalak,
+          xDiam: _tata.xPemalak,
+          xKeluar: _tata.xKeluarPemalak,
+          yKaki: _tata.yKakiPemalak,
+          langsungDiam: snap,
+        );
+        add(_pemalak!);
+      }
+      var tingkat = 0;
+      for (final a in c.ambangPeringatan) {
+        if (o.kemarahan >= a) tingkat++;
+      }
+      _pemalak!
+        ..aturTingkat(tingkat)
+        // Saat hadir, kalimatnya tampil di bubble memalak (overlay).
+        ..aturUcapan(null);
+    } else if (_pemalak != null && !_pemalak!.sedangKeluar) {
+      _pemalak!.pergi();
+      _kunjungan = null;
+    }
+    final pk = _pemalak;
+    if (pk != null && pk.sedangKeluar) {
+      final u = _ucapanDari(t, SumberUcapan.ormas);
+      pk.aturUcapan(u?.teks, alpha: u == null ? 0 : _alphaUcapan(u));
+    }
+
+    // Pak RT: posisi mengikuti fase engine (berjalan / durasiDatang).
+    final f = o?.pakRT;
+    if (f != null && c != null) {
+      final r = _pakRT;
+      if (r == null || r.sedangKeluar) {
+        _pakRT = PakRTKomponen(
+          ukuran: _tata.ukuranPakRT,
+          x: _tata.xTepiKananPakRT,
+          yKaki: _tata.yKakiPemalak,
+          kecepatan: _tata.kecepatan,
+        );
+        add(_pakRT!);
+      }
+      final k = (f.berjalan / c.pakRT.durasiDatang).clamp(0.0, 1.0);
+      final x0 = _tata.xTepiKananPakRT;
+      _pakRT!.keX(x0 + (_tata.xBerhentiPakRT - x0) * k);
+    } else if (_pakRT != null && !_pakRT!.sedangKeluar) {
+      _pakRT!.pergi(_tata.xTepiKananPakRT);
+    }
+    final u = _ucapanDari(t, SumberUcapan.pakRT);
+    _pakRT?.aturUcapan(u?.teks, alpha: u == null ? 0 : _alphaUcapan(u));
+  }
+
+  void _sinkronKasir(Toko t) {
+    if (!t.punyaKasir) {
+      _kasir?.removeFromParent();
+      _kasir = null;
+      return;
+    }
+    var k = _kasir;
+    if (k == null) {
+      k = _kasir = KasirKomponen();
+      add(k);
+    }
+    k.atur(
+      x: _tata.xKasir,
+      yKaki: _tata.yMeja,
+      ukuran: _tata.ukuranKasir,
+      label: t.kasirLevel > 0 ? 'Lv${t.kasirLevel}' : 'Kasir',
+      progres: t.prosesKasir?.progres,
+    );
+    final u = _ucapanDari(t, SumberUcapan.kasir);
+    k.aturUcapan(u?.teks, alpha: u == null ? 0 : _alphaUcapan(u));
   }
 
   /// Fade-out pada 0,4 detik terakhir ucapan.

@@ -16,10 +16,18 @@ class SesiLayani {
 
 /// Pelanggan yang sedang diproses kasir otomatis.
 class ProsesKasir {
-  ProsesKasir({required this.pelanggan, required this.sisaDetik});
+  ProsesKasir({required this.pelanggan, required this.sisaDetik})
+    : durasi = sisaDetik;
 
   final Pelanggan pelanggan;
+
+  /// Durasi proses penuh (untuk progres di UI).
+  final double durasi;
   double sisaDetik;
+
+  /// 0..1.
+  double get progres =>
+      durasi <= 0 ? 1 : ((durasi - sisaDetik) / durasi).clamp(0.0, 1.0);
 }
 
 /// Statistik satu hari untuk satu toko (bahan laporan).
@@ -27,7 +35,10 @@ class StatistikHarian {
   double pendapatan = 0;
   double tip = 0;
   double hpp = 0;
+
+  /// Total setoran ke pemalak (= jumlah [setoranPemalak]).
   double jatahOrmas = 0;
+  final Map<JenisPemalak, double> setoranPemalak = {};
   double denda = 0;
   int dilayani = 0;
   int dilayaniKasir = 0;
@@ -111,9 +122,18 @@ class Toko {
   /// Jarak ke kedatangan berikutnya dalam satuan Exp(1).
   double sisaKedatangan = 0;
 
-  // Ormas & segel.
+  // Ormas (pemalak) & segel.
   KunjunganOrmas? ormas;
   double? jadwalOrmas;
+
+  /// Jenis pemalak untuk [jadwalOrmas] (diundi saat dijadwalkan).
+  JenisPemalak? jenisJadwalOrmas;
+
+  /// Pemalak yang menyegel toko ini (berlaku selama [kondisiSegel]).
+  JenisPemalak? penyegel;
+
+  /// Lapor Pak RT baru bisa dipakai lagi setelah detik ini (hari ini).
+  double pakRTJedaSampai = 0;
 
   /// Ormas sudah datang hari ini (maks 1 kunjungan terjadwal per hari).
   bool ormasDatangHariIni = false;

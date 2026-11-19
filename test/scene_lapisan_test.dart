@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngebul/data/sim_data.dart';
 import 'package:ngebul/models/katalog.dart';
+import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/widgets/gelembung_komik.dart';
@@ -78,7 +79,10 @@ void main() {
     }
     // Kasir & ormas (Stage 2d) masih di sini, beserta ucapan ormas.
     expect(find.text(TampilanData.emojiFigurKasir), findsOneWidget);
-    expect(find.text(e.config.ormas.emoji), findsOneWidget);
+    expect(
+      find.text(e.konfigPemalak(JenisPemalak.jeruk).emoji),
+      findsOneWidget,
+    );
     expect(find.byType(GelembungKomik), findsWidgets);
     // Tidak menelan tap di area pelanggan Flame.
     expect(

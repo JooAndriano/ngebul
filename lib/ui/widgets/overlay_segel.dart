@@ -35,7 +35,8 @@ class OverlaySegel extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${v.toko.nama} disegel ${e.config.ormas.namaSingkat} '
+                    '${v.toko.nama} disegel '
+                    '${v.toko.penyegel == null ? 'pemalak' : e.namaPemalak(v.toko.penyegel!)} '
                     'hari ini.\nTidak ada pelanggan di toko ini. '
                     '${e.pengaliWaktu > 1 ? 'Semua toko disegel: waktu berjalan x${e.pengaliWaktu.toStringAsFixed(0)}.' : 'Toko lain tetap buka.'}',
                     textAlign: TextAlign.center,

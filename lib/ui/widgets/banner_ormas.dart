@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/number_format.dart';
+import '../../data/pemalak_data.dart';
 import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
-import '../notif/notif_model.dart';
-import '../notif/notif_service.dart';
+import 'notif_pemalak.dart';
 
-/// Banner pilihan saat ormas hadir. Game tidak pause.
+/// Banner pilihan saat pemalak hadir (scene lama, flag pakaiSceneFlame
+/// false). Jalur Flame memakai BubblePemalak. Game tidak pause.
 class BannerOrmas extends ConsumerWidget {
   const BannerOrmas({super.key});
 
@@ -20,63 +21,33 @@ class BannerOrmas extends ConsumerWidget {
     final o = v.toko.ormas;
     if (o == null) return const SizedBox.shrink();
     final c = e.config.ormas;
+    final p = e.konfigPemalak(o.jenis);
     final ctrl = ref.read(simControllerProvider.notifier);
     final theme = Theme.of(context);
     final tingkat = e.tingkatPeringatanOrmas(v.toko.id);
     final tawar = o.jatah * c.porsiTawar;
+    final pakRT = o.sedangPakRT;
 
     final warna = switch (tingkat) {
       0 => Colors.amber.shade100,
       1 => Colors.orange.shade200,
       _ => Colors.red.shade300,
     };
-    final peringatan = switch (tingkat) {
-      0 => 'Minta jatah keamanan.',
-      1 => 'Mulai kesal...',
-      _ => 'Sangat marah! Warung bisa disegel!',
-    };
+    final peringatan = pakRT
+        ? TeksPemalakData.pakRTSedangDatang
+        : switch (tingkat) {
+            0 => 'Minta setoran.',
+            1 => 'Mulai kesal...',
+            _ => 'Sangat marah! Warung bisa disegel!',
+          };
 
-    void kabari(HasilOrmas h) {
-      final (jenis, pesan) = switch (h) {
-        HasilOrmas.dibayar => (
-          JenisNotif.sukses,
-          'Jatah dibayar. Mereka pergi.',
-        ),
-        HasilOrmas.tawarDiterima => (
-          JenisNotif.sukses,
-          'Tawaran diterima. Mereka pergi.',
-        ),
-        HasilOrmas.tawarDitolak => (
-          JenisNotif.bahaya,
-          'Tawaran ditolak! Mereka makin marah.',
-        ),
-        HasilOrmas.rtBerhasil => (
-          JenisNotif.sukses,
-          'Pak RT berhasil mengusir mereka.',
-        ),
-        HasilOrmas.rtGagal => (
-          JenisNotif.bahaya,
-          'Pak RT gagal. Mereka makin marah.',
-        ),
-        HasilOrmas.uangKurang => (JenisNotif.peringatan, 'Uang tidak cukup.'),
-        HasilOrmas.tidakBisa => (JenisNotif.peringatan, 'Tidak bisa.'),
-      };
-      ref
-          .read(notifServiceProvider)
-          .tampilkan(
-            NotifModel(
-              jenis: jenis,
-              prioritas: jenis == JenisNotif.sukses
-                  ? PrioritasNotif.rendah
-                  : PrioritasNotif.sedang,
-              judul: v.toko.nama,
-              pesan: pesan,
-              emoji: h == HasilOrmas.rtBerhasil || h == HasilOrmas.rtGagal
-                  ? TampilanData.emojiPakRt
-                  : c.emoji,
-            ),
-          );
-    }
+    void kabari(HasilOrmas h) => kabariHasilOrmas(
+      ref,
+      engine: e,
+      namaToko: v.toko.nama,
+      jenis: o.jenis,
+      hasil: h,
+    );
 
     return Material(
       color: warna,
@@ -86,7 +57,7 @@ class BannerOrmas extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
         child: Row(
           children: [
-            Text(c.emoji, style: const TextStyle(fontSize: 28)),
+            Text(p.emoji, style: const TextStyle(fontSize: 28)),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -94,8 +65,8 @@ class BannerOrmas extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${c.namaSingkat}: ${TampilanData.emojiJatah} '
-                    'Jatah ${formatRupiah(o.jatah)}',
+                    '${p.nama}: ${TampilanData.emojiJatah} '
+                    '${formatRupiah(o.jatah)}',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -127,21 +98,21 @@ class BannerOrmas extends ConsumerWidget {
                 alignment: WrapAlignment.end,
                 children: [
                   FilledButton(
-                    onPressed: e.uang >= o.jatah
+                    onPressed: !pakRT && e.uang >= o.jatah
                         ? () => kabari(ctrl.bayarOrmas())
                         : null,
                     child: const Text('Bayar'),
                   ),
                   FilledButton.tonal(
-                    onPressed: !o.tawarDipakai && e.uang >= tawar
+                    onPressed: !pakRT && !o.tawarDipakai && e.uang >= tawar
                         ? () => kabari(ctrl.tawarOrmas())
                         : null,
                     child: Text('Tawar ${formatRupiah(tawar)}'),
                   ),
                   OutlinedButton(
-                    onPressed: o.rtDipakai
-                        ? null
-                        : () => kabari(ctrl.panggilPakRt()),
+                    onPressed: e.bisaLaporPakRT(v.toko.id)
+                        ? () => kabari(ctrl.laporPakRT())
+                        : null,
                     child: Text('${TampilanData.emojiPakRt} Pak RT'),
                   ),
                 ],

@@ -528,10 +528,21 @@ void main() {
       expect(terakhir(SumberUcapan.ormas), SituasiUcapan.ormasDatang);
       e.tick(30.5);
       expect(terakhir(SumberUcapan.ormas), SituasiUcapan.ormasMarah50);
-      r.atur([0.9]);
-      e.panggilPakRt(toko1);
+      // Pak RT vs Ormas Rasa Jeruk: datang -> berseru usir -> pergi.
+      e.laporPakRT(toko1);
       expect(terakhir(SumberUcapan.pakRT), SituasiUcapan.pakRT);
+      e.tick(1.6);
+      expect(terakhir(SumberUcapan.pakRT), SituasiUcapan.pakRTUsir);
+      expect(terakhir(SumberUcapan.ormas), SituasiUcapan.ormasPergiKarenaPakRT);
+      e.tick(2);
+      expect(e.toko(toko1).ormas, isNull);
+      // Pak RT vs Si Coklat: gak sanggup, lalu dibayar.
+      e.munculkanOrmas(toko1, jenis: JenisPemalak.coklat);
+      e.laporPakRT(toko1);
+      e.tick(1.6);
+      expect(terakhir(SumberUcapan.pakRT), SituasiUcapan.pakRTGagal);
       expect(terakhir(SumberUcapan.ormas), SituasiUcapan.ormasPakRTGagal);
+      e.tick(2);
       e.bayarOrmas(toko1);
       expect(terakhir(SumberUcapan.ormas), SituasiUcapan.ormasBayar);
 

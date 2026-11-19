@@ -43,7 +43,12 @@ extension AlertEngine on SimulationEngine {
 
   /// Kirim alert jika belum ada alert sama (toko+jenis+item) yang aktif.
   /// Jika toko punya kasir, teksnya juga diucapkan kasir.
-  AlertEvent? _alert(JenisAlert jenis, Toko t, {String? itemId}) {
+  AlertEvent? _alert(
+    JenisAlert jenis,
+    Toko t, {
+    String? itemId,
+    JenisPemalak? pemalak,
+  }) {
     _sinkronAlert();
     if (_alerts.any((a) => a.aktif && a.sama(t.id, jenis, itemId))) {
       return null;
@@ -52,7 +57,7 @@ extension AlertEngine on SimulationEngine {
     final templat = (olehKasir
         ? AlertTeksData.kasir
         : AlertTeksData.sistem)[jenis]!;
-    final teks = _isiTeksAlert(templat, t, itemId);
+    final teks = _isiTeksAlert(templat, t, itemId, pemalak);
     final a = AlertEvent(
       id: ++_idAlert,
       tokoId: t.id,
@@ -64,6 +69,7 @@ extension AlertEngine on SimulationEngine {
       hari: _s.hari,
       waktu: jam,
       itemId: itemId,
+      pemalak: pemalak,
     );
     _alerts.add(a);
     t.stat.alertDikirim++;
@@ -78,18 +84,23 @@ extension AlertEngine on SimulationEngine {
     return a;
   }
 
-  String _isiTeksAlert(String templat, Toko t, String? itemId) =>
-      AlertTeksData.isi(
-        templat,
-        item: itemId == null ? '' : t.katalog.itemById(itemId).nama,
-        toko: t.nama,
-        ormas: config.ormas.namaSingkat,
-      );
+  String _isiTeksAlert(
+    String templat,
+    Toko t,
+    String? itemId,
+    JenisPemalak? pemalak,
+  ) => AlertTeksData.isi(
+    templat,
+    item: itemId == null ? '' : t.katalog.itemById(itemId).nama,
+    toko: t.nama,
+    ormas: config.ormas.pemalak(pemalak ?? JenisPemalak.jeruk).nama,
+  );
 
   /// Tulis ulang teks alert toko [t] dengan namanya yang sekarang.
   void _perbaruiTeksAlert(Toko t) {
     for (final a in _alerts) {
-      if (a.tokoId == t.id) a.teks = _isiTeksAlert(a.templat, t, a.itemId);
+      if (a.tokoId != t.id) continue;
+      a.teks = _isiTeksAlert(a.templat, t, a.itemId, a.pemalak);
     }
   }
 
@@ -151,11 +162,17 @@ extension AlertEngine on SimulationEngine {
     String? tipeId,
     Sisi? sisi,
     String? teks,
+    JenisPemalak? pemalak,
   }) {
     final pilihan = teks != null
         ? [teks]
         : [
-            for (final x in UcapanData.pilihan(sumber, situasi, tipeId: tipeId))
+            for (final x in UcapanData.pilihan(
+              sumber,
+              situasi,
+              tipeId: tipeId,
+              pemalak: pemalak,
+            ))
               x.replaceAll('{toko}', t.nama),
           ];
     if (pilihan.isEmpty) return null;
@@ -169,6 +186,7 @@ extension AlertEngine on SimulationEngine {
       pelangganId: pelangganId,
       tipeId: tipeId,
       sisi: sisi,
+      pemalak: pemalak,
     );
     for (final lama in _ucapan) {
       if (lama.entitasSama(u) && situasi.prioritas < lama.situasi.prioritas) {

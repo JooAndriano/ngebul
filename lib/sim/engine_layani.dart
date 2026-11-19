@@ -152,7 +152,7 @@ extension LayaniEngine on SimulationEngine {
     t.sesiLayani = null;
     _majukanFaseKesabaran(t);
 
-    final r = RumusSim.rating(config, p.fraksiKesabaran);
+    final r = RumusSim.ratingPelanggan(config, p);
     final total = _jual(t, baris);
     final tip = total * r.persenTip;
     _s.uang += tip;
@@ -267,7 +267,7 @@ extension LayaniEngine on SimulationEngine {
     }
     t.antrean[sisi]!.remove(p);
     _majukanFaseKesabaran(t);
-    final r = RumusSim.rating(config, p.fraksiKesabaran);
+    final r = RumusSim.ratingPelanggan(config, p);
     final total = _jual(t, p.pesanan.baris);
     t.stat.dilayaniKasir++;
     _ubahReputasi(t, config.kasir.reputasi);

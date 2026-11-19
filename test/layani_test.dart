@@ -126,7 +126,8 @@ void main() {
   });
 
   group('tip & reputasi per rating', () {
-    // Pelajar 1 unit di depan: kesabaran 60 x 20/18 = 66,7 dtk.
+    // Pelajar 1 unit (skala 20/18): Kilat <= 7,2 x 1,11 + 1 = 9 dtk,
+    // Lancar <= 12,6 x 1,11 + 1,75 = 15,75 dtk menunggu di depan.
     (HasilLayani, double) layaniSetelah(double detik) {
       final e = buatEngine();
       datang(e, pesananItem({'nasi_goreng': 1}));
@@ -136,23 +137,23 @@ void main() {
       return (h, e.toko(toko1).reputasi - rep);
     }
 
-    test('Kilat (>= 0,6): tip 15%, reputasi +0,6', () {
-      final (h, dRep) = layaniSetelah(15); // 0,78
+    test('Kilat (<= 9 dtk): tip 15%, reputasi +0,6', () {
+      final (h, dRep) = layaniSetelah(8.9);
       expect(h.rating, RatingKecepatan.kilat);
       expect(h.total, 15000);
       expect(h.tip, closeTo(2250, 1e-9));
       expect(dRep, closeTo(0.6, 1e-9));
     });
 
-    test('Lancar (0,3-0,6): tip 5%, reputasi +0,3', () {
-      final (h, dRep) = layaniSetelah(30); // 0,55
+    test('Lancar (9-15,75 dtk): tip 5%, reputasi +0,3', () {
+      final (h, dRep) = layaniSetelah(9.1);
       expect(h.rating, RatingKecepatan.lancar);
       expect(h.tip, closeTo(750, 1e-9));
       expect(dRep, closeTo(0.3, 1e-9));
     });
 
-    test('Mepet (< 0,3): tanpa tip, reputasi +0,1', () {
-      final (h, dRep) = layaniSetelah(47); // 0,295
+    test('Mepet (> 15,75 dtk): tanpa tip, reputasi +0,1', () {
+      final (h, dRep) = layaniSetelah(15.9);
       expect(h.rating, RatingKecepatan.mepet);
       expect(h.tip, 0);
       expect(dRep, closeTo(0.1, 1e-9));

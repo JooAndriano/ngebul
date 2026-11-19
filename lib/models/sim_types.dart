@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'pesanan.dart';
 import 'tipe_pelanggan_data.dart';
 
@@ -67,6 +69,11 @@ class Pelanggan {
 
   double get fraksiKesabaran =>
       kesabaranAwal <= 0 ? 0 : (sisaKesabaran / kesabaranAwal).clamp(0, 1);
+
+  /// Lama menunggu di fase layani (sejak berada di depan antrean),
+  /// termasuk penalti salah ambil. 0 jika belum di depan. Dasar rating.
+  double get detikMenunggu =>
+      diDepan ? math.max(0, kesabaranAwal - sisaKesabaran) : 0;
 }
 
 enum HasilAmbil { masuk, salahAmbil, stokKurang, tidakAdaSesi }
@@ -144,6 +151,7 @@ class AlertEvent {
     required this.hari,
     required this.waktu,
     this.itemId,
+    this.pemalak,
   });
 
   /// Naik terus; UI memakai ini untuk tahu alert mana yang baru.
@@ -155,6 +163,9 @@ class AlertEvent {
   /// Templat teks ({toko}, {item}, {ormas}); dipakai engine untuk
   /// memperbarui [teks] saat toko diganti nama.
   final String templat;
+
+  /// Jenis pemalak untuk {ormas} (alert ormas & segel).
+  final JenisPemalak? pemalak;
 
   /// Teks yang tampil (selalu memakai nama toko terkini). Hanya diubah engine.
   String teks;
@@ -201,7 +212,13 @@ enum SituasiUcapan {
   ormasBayar(4),
   ormasTawarDiterima(4),
   ormasTawarDitolak(4),
+
+  /// Pak RT datang (awal fase Pak RT).
   pakRT(4),
+
+  /// Pak RT tiba: mengusir (berhasil) / menyerah (gagal).
+  pakRTUsir(4),
+  pakRTGagal(4),
   ormasPergiKarenaPakRT(4),
   ormasPakRTGagal(4),
 
@@ -226,10 +243,14 @@ class UcapanEvent {
     this.pelangganId,
     this.tipeId,
     this.sisi,
+    this.pemalak,
   }) : sisaDetik = durasi;
 
   final int id;
   final SumberUcapan sumber;
+
+  /// Untuk sumber ormas: jenis pemalak yang berbicara.
+  final JenisPemalak? pemalak;
 
   /// Untuk sumber pelanggan.
   final int? pelangganId;
@@ -267,32 +288,89 @@ class EfekKomik {
 
 // ------------------------------------------------------------------- Ormas
 
-/// Ormas yang sedang hadir di satu toko. Hanya diubah oleh SimulationEngine.
-class KunjunganOrmas {
-  KunjunganOrmas({required this.jatah});
+/// Tiga jenis pemalak (fiktif, plesetan generik). Nama & angka ada di
+/// PemalakConfig; identifier internal tetap memakai kata "ormas".
+enum JenisPemalak { jeruk, pajek, coklat }
 
+/// Pak RT sedang menangani kunjungan (berjalan dalam waktu game). Selama
+/// fase ini kemarahan tidak naik dan pemain tidak bisa memilih aksi lain.
+class FasePakRT {
+  FasePakRT({required this.berhasil, required this.durasi})
+    : sisaDetik = durasi;
+
+  /// Ditentukan saat dipanggil (dari jenis pemalak); efeknya di akhir fase.
+  final bool berhasil;
+  final double durasi;
+
+  /// Hanya diubah engine.
+  double sisaDetik;
+
+  /// Pak RT sudah tiba dan berseru (usir / gak sanggup).
+  bool sudahBerseru = false;
+
+  double get berjalan => durasi - sisaDetik;
+}
+
+/// Hasil Pak RT yang sudah selesai (untuk notifikasi UI). [id] naik terus.
+class HasilPakRT {
+  const HasilPakRT({
+    required this.id,
+    required this.tokoId,
+    required this.pemalak,
+    required this.berhasil,
+  });
+
+  final int id;
+  final String tokoId;
+  final JenisPemalak pemalak;
+  final bool berhasil;
+}
+
+/// Pemalak yang sedang hadir di satu toko. Hanya diubah oleh
+/// SimulationEngine.
+class KunjunganOrmas {
+  KunjunganOrmas({required this.jatah, this.jenis = JenisPemalak.jeruk});
+
+  final JenisPemalak jenis;
   final double jatah;
   double kemarahan = 0;
 
   /// Tingkat peringatan tertinggi yang sudah diucapkan (0, 1, 2).
   int peringatanTerucap = 0;
   bool tawarDipakai = false;
+
+  /// Lapor Pak RT sudah dipakai pada kunjungan ini (sekali saja).
   bool rtDipakai = false;
+
+  /// Fase Pak RT yang sedang berjalan (null = tidak ada).
+  FasePakRT? pakRT;
+
+  /// Kalimat terakhir pemalak, untuk bubble memalak. Hanya diubah engine.
+  String kalimat = '';
+
+  bool get sedangPakRT => pakRT != null;
 }
 
 enum HasilOrmas {
   dibayar,
   tawarDiterima,
   tawarDitolak,
-  rtBerhasil,
-  rtGagal,
+
+  /// Pak RT dipanggil; hasilnya (usir / gak sanggup) di akhir fase Pak RT.
+  rtDatang,
+
+  /// Pak RT masih jeda (cooldown dari config).
+  rtJeda,
   uangKurang,
+
+  /// Tidak ada kunjungan, sudah dipakai, atau sedang fase Pak RT.
   tidakBisa,
 }
 
+/// Label laporan; nama pemalak ditambahkan UI dari LaporanToko.penyegel.
 enum StatusSegel {
   tidak('Buka normal'),
-  kenaSegel('Disegel ormas'),
+  kenaSegel('Disegel'),
   disegelPenuh('Disegel seharian'),
   ditebus('Segel ditebus');
 
@@ -327,6 +405,8 @@ class LaporanToko {
     required this.jumlahTerlaris,
     required this.statusSegel,
     required this.alertDikirim,
+    this.setoranPemalak = const {},
+    this.penyegel,
   });
 
   final String tokoId;
@@ -339,7 +419,15 @@ class LaporanToko {
   final double biayaHarian;
   final double gajiKasir;
   final int kasirLevel;
+
+  /// Total setoran ke semua pemalak (= jumlah [setoranPemalak]).
   final double jatahOrmas;
+
+  /// Setoran per jenis pemalak (hanya yang pernah dibayar hari itu).
+  final Map<JenisPemalak, double> setoranPemalak;
+
+  /// Pemalak yang menyegel toko ini (kena segel / disegel penuh).
+  final JenisPemalak? penyegel;
   final double dendaSegel;
   final int dilayani;
 

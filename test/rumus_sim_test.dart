@@ -119,16 +119,55 @@ void main() {
     }
   });
 
-  test('rating kecepatan: >=0,6 Kilat, 0,3-0,6 Lancar, <0,3 Mepet', () {
-    expect(RumusSim.rating(c, 1).rating, RatingKecepatan.kilat);
-    expect(RumusSim.rating(c, 0.6).rating, RatingKecepatan.kilat);
-    expect(RumusSim.rating(c, 0.59).rating, RatingKecepatan.lancar);
-    expect(RumusSim.rating(c, 0.3).rating, RatingKecepatan.lancar);
-    expect(RumusSim.rating(c, 0.29).rating, RatingKecepatan.mepet);
-    expect(RumusSim.rating(c, 0).rating, RatingKecepatan.mepet);
-    final kilat = RumusSim.rating(c, 1);
-    expect(kilat.persenTip, 0.15);
-    expect(kilat.reputasi, 0.6);
+  group('rating kecepatan: detik absolut di fase layani', () {
+    RatingKecepatan r(double detik, {double dasar = 18, int unit = 1}) =>
+        RumusSim.rating(
+          c,
+          detik,
+          kesabaranDasar: dasar,
+          totalUnit: unit,
+        ).rating;
+
+    test('tipe acuan 1 unit: Kilat <= 8,2; Lancar <= 14,35; lalu Mepet', () {
+      expect(r(0), RatingKecepatan.kilat);
+      expect(r(8.2), RatingKecepatan.kilat);
+      expect(r(8.21), RatingKecepatan.lancar);
+      expect(r(14.35), RatingKecepatan.lancar);
+      expect(r(14.36), RatingKecepatan.mepet);
+      expect(r(1000), RatingKecepatan.mepet);
+    });
+
+    test('= aturan lama: 40% / 70% dari (dasar + 2,5 x unit)', () {
+      for (final dasar in [14.0, 18.0, 20.0, 25.0]) {
+        for (final unit in [1, 3, 8]) {
+          final lama = dasar + 2.5 * unit;
+          expect(
+            r(lama * 0.4 - 1e-6, dasar: dasar, unit: unit),
+            RatingKecepatan.kilat,
+          );
+          expect(
+            r(lama * 0.4 + 1e-6, dasar: dasar, unit: unit),
+            RatingKecepatan.lancar,
+          );
+          expect(
+            r(lama * 0.7 - 1e-6, dasar: dasar, unit: unit),
+            RatingKecepatan.lancar,
+          );
+          expect(
+            r(lama * 0.7 + 1e-6, dasar: dasar, unit: unit),
+            RatingKecepatan.mepet,
+          );
+        }
+      }
+    });
+
+    test('tidak bergantung panjang kesabaran fase layani', () {
+      // Kesabaran layani 60 dtk: 20 dtk menunggu = sisa 67% (dulu Kilat).
+      expect(r(20), RatingKecepatan.mepet);
+      final kilat = RumusSim.ratingConfig(c, RatingKecepatan.kilat);
+      expect(kilat.persenTip, 0.15);
+      expect(kilat.reputasi, 0.6);
+    });
   });
 
   test('durasi kasir = 1,5 + 1,2 x unit', () {

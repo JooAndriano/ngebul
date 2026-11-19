@@ -105,11 +105,13 @@ void main() {
       datang(e, pesananItem({'es_teh': 1}), tipeId: 'irt'); // kiri
       datang(e, pesananItem({'es_teh': 1}), tipeId: 'irt'); // kanan
       datang(e, pesananItem({'es_teh': 1}), tipeId: 'irt'); // kiri ke-2
-      e.tick(100); // kedua sudah antre 100 dtk, depan kiri kabur di 60
+      e.tick(70); // kedua sudah antre 70 dtk, depan kiri kabur di 60
       final kedua = e.antrean(toko1, Sisi.kiri).single;
       expect(kedua.diDepan, isTrue);
+      expect(kedua.detikMenunggu, closeTo(10, 0.11));
       final h = layaniPenuh(e, Sisi.kiri)!;
-      // 40 dtk di depan dari 60: sisa 20/60 = 0,33 -> lancar.
+      // 10 dtk di depan (8,2 < 10 <= 14,35) -> lancar. Dihitung dari datang
+      // (70 dtk) akan menjadi mepet.
       expect(h.rating, RatingKecepatan.lancar);
     });
 

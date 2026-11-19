@@ -4,6 +4,7 @@ import '../models/sim_config.dart';
 import '../models/sim_types.dart';
 import '../models/tipe_pelanggan_data.dart';
 import 'katalog_data.dart';
+import 'pemalak_data.dart';
 
 /// Konfigurasi default. Nanti diganti hasil muat JSON / Remote Config.
 final SimConfig simConfigDefault = SimConfig(
@@ -44,10 +45,19 @@ final SimConfig simConfigDefault = SimConfig(
   kesabaranDasarAcuan: 18,
   kesabaranPerUnit: 2.5,
   penaltiSalahAmbil: 1.5,
+  // Rating = lama menunggu di fase layani (detik absolut), BUKAN pecahan
+  // kesabaran. Diturunkan dari aturan sebelum Stage 2c: kesabaran lama =
+  // kesabaranDasar + 2,5 x unit (dari datang), Kilat jika sisa >= 60%
+  // (menunggu <= 40%), Lancar jika sisa >= 30% (menunggu <= 70%).
+  //   Kilat : 0,4 x 18 = 7,2 dtk x skala tipe + 0,4 x 2,5 = 1,0 dtk/unit
+  //   Lancar: 0,7 x 18 = 12,6 dtk x skala tipe + 0,7 x 2,5 = 1,75 dtk/unit
+  // Tipe acuan 1 unit: Kilat <= 8,2 dtk, Lancar <= 14,35 dtk. Skala tipe
+  // (kesabaranDasar / 18) dipertahankan karena aturan lama juga begitu.
   rating: const [
     RatingConfig(
       rating: RatingKecepatan.kilat,
-      ambangMin: 0.6,
+      maksDetik: 7.2,
+      maksDetikPerUnit: 1.0,
       persenTip: 0.15,
       reputasi: 0.6,
       emoji: '⚡',
@@ -55,7 +65,8 @@ final SimConfig simConfigDefault = SimConfig(
     ),
     RatingConfig(
       rating: RatingKecepatan.lancar,
-      ambangMin: 0.3,
+      maksDetik: 12.6,
+      maksDetikPerUnit: 1.75,
       persenTip: 0.05,
       reputasi: 0.3,
       emoji: '👍',
@@ -63,7 +74,8 @@ final SimConfig simConfigDefault = SimConfig(
     ),
     RatingConfig(
       rating: RatingKecepatan.mepet,
-      ambangMin: 0,
+      maksDetik: double.infinity,
+      maksDetikPerUnit: 0,
       persenTip: 0,
       reputasi: 0.1,
       emoji: '😅',
@@ -101,29 +113,58 @@ final SimConfig simConfigDefault = SimConfig(
     bonusKedatanganPerLevel: 0.08,
   ),
   ormas: const OrmasConfig(
-    // Fiktif. Jangan diganti nama organisasi nyata.
-    nama: 'Perkumpulan Pemuda Bela Lapak',
-    namaSingkat: 'PPBL',
-    emoji: '🕶️',
+    // Fiktif, plesetan generik. Nama ada di pemalak_data.dart.
+    // Jeruk = angka "ormas" lama (basis). Waktu dari datang sampai segel
+    // jika diabaikan: Jeruk 60 dtk, Coklat 90 dtk, Pajek 150 dtk.
+    jenis: [
+      PemalakConfig(
+        jenis: JenisPemalak.jeruk,
+        nama: NamaPemalak.jeruk,
+        emoji: IkonPemalak.jeruk,
+        bobot: 50,
+        kemarahanPerDetik: 100 / 60,
+        persenJatah: 0.10,
+        jatahMin: 20000,
+        jatahMaks: 150000,
+        bisaDiusirPakRT: true,
+      ),
+      PemalakConfig(
+        jenis: JenisPemalak.pajek,
+        nama: NamaPemalak.pajek,
+        emoji: IkonPemalak.pajek,
+        bobot: 25,
+        kemarahanPerDetik: 100 / 150,
+        persenJatah: 0.25,
+        jatahMin: 75000,
+        jatahMaks: 400000,
+        bisaDiusirPakRT: false,
+      ),
+      PemalakConfig(
+        jenis: JenisPemalak.coklat,
+        nama: NamaPemalak.coklat,
+        emoji: IkonPemalak.coklat,
+        bobot: 25,
+        kemarahanPerDetik: 100 / 90,
+        persenJatah: 0.15,
+        jatahMin: 40000,
+        jatahMaks: 250000,
+        bisaDiusirPakRT: false,
+      ),
+    ],
+    pakRT: PakRTConfig(durasiDatang: 1.5, durasiFase: 3.5, biaya: 0, jeda: 0),
     hariMulai: 3,
     peluangPerHariUtama: 0.3,
     peluangPerHariCabang: 0.25,
     tundaJikaAdaOrmasLain: 30,
     jamMunculMin: 10,
     jamMunculMaks: 17,
-    persenJatah: 0.10,
-    jatahMin: 20000,
-    jatahMaks: 150000,
     pembulatanJatah: 5000,
     faktorKedatangan: 0.5,
     kemarahanMaks: 100,
-    kemarahanPerDetik: 100 / 60,
     ambangPeringatan: [50, 80],
     porsiTawar: 0.5,
     peluangTawarDiterima: 0.5,
     kemarahanTawarDitolak: 30,
-    peluangRtBerhasil: 0.5,
-    kemarahanRtGagal: 25,
     reputasiSegel: -5,
     pengaliWaktuSaatDisegel: 10,
     dendaKaliJatah: 3,
@@ -222,7 +263,7 @@ abstract final class TampilanData {
 
   // Ormas & segel.
   static const String emojiJatah = '💰';
-  static const String emojiPakRt = '👮';
+  static const String emojiPakRt = IkonPemalak.pakRT;
   static const String emojiSegel = '🚫';
 
   /// Potongan lapak tambahan per level ekspansi (placeholder).
