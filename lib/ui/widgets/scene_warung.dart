@@ -11,9 +11,16 @@ import 'gelembung_komik.dart';
 import 'ui_helper.dart';
 
 /// Scene placeholder tampak depan: antrean kiri | warung | antrean kanan.
-/// Pelanggan terdepan berada paling dekat warung. Nanti diganti Flame.
+/// Pelanggan terdepan berada paling dekat warung.
+///
+/// [modeLapisan]: dipasang di atas scene Flame (Stage 2). Latar, emoji
+/// pelanggan, dan bangunan warung disembunyikan (digambar Flame), sedangkan
+/// tap layani, balon status, bar kesabaran, gelembung ucapan, kasir, ormas,
+/// dan baris kejadian tetap tampil.
 class SceneWarung extends ConsumerWidget {
-  const SceneWarung({super.key});
+  const SceneWarung({super.key, this.modeLapisan = false});
+
+  final bool modeLapisan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,16 +51,18 @@ class SceneWarung extends ConsumerWidget {
         ref.read(simControllerProvider.notifier).bukaLayani(sisi);
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            theme.colorScheme.surface,
-            theme.colorScheme.secondaryContainer,
-          ],
-        ),
-      ),
+      decoration: modeLapisan
+          ? const BoxDecoration()
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.colorScheme.surface,
+                  theme.colorScheme.secondaryContainer,
+                ],
+              ),
+            ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 72),
         child: Column(
@@ -73,9 +82,15 @@ class SceneWarung extends ConsumerWidget {
                             sisi: Sisi.kiri,
                             ucapan: ucapanPelanggan,
                             onKetuk: () => layani(Sisi.kiri),
+                            modeLapisan: modeLapisan,
                           ),
                         ),
-                        _BlokWarung(engine: e, toko: t, ucapan: ucapan),
+                        _BlokWarung(
+                          engine: e,
+                          toko: t,
+                          ucapan: ucapan,
+                          modeLapisan: modeLapisan,
+                        ),
                         Expanded(
                           child: _BarisAntrean(
                             engine: e,
@@ -83,6 +98,7 @@ class SceneWarung extends ConsumerWidget {
                             sisi: Sisi.kanan,
                             ucapan: ucapanPelanggan,
                             onKetuk: () => layani(Sisi.kanan),
+                            modeLapisan: modeLapisan,
                           ),
                         ),
                       ],
@@ -143,9 +159,11 @@ class _BlokWarung extends StatelessWidget {
     required this.engine,
     required this.toko,
     required this.ucapan,
+    this.modeLapisan = false,
   });
   final SimulationEngine engine;
   final Toko toko;
+  final bool modeLapisan;
 
   /// Ucapan aktif di toko ini.
   final List<UcapanEvent> ucapan;
@@ -188,6 +206,10 @@ class _BlokWarung extends StatelessWidget {
   }
 
   Widget _isiBlok(Widget Function() potongan) {
+    // Mode lapisan: bangunan digambar Flame; tetap disusun (tak terlihat)
+    // agar posisi kasir & ormas tidak bergeser.
+    Widget bangunan(Widget w) =>
+        modeLapisan ? Opacity(opacity: 0, child: w) : w;
     final teksOrmas = _teks(SumberUcapan.ormas);
     final teksRt = _teks(SumberUcapan.pakRT);
     final teksKasir = _teks(SumberUcapan.kasir);
@@ -216,11 +238,16 @@ class _BlokWarung extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            for (var i = 0; i < toko.ekspansi[Sisi.kiri]!; i++) potongan(),
-            Text(toko.katalog.emoji, style: const TextStyle(fontSize: 22)),
-            const Text(
-              TampilanData.emojiWarung,
-              style: TextStyle(fontSize: 64),
+            for (var i = 0; i < toko.ekspansi[Sisi.kiri]!; i++)
+              bangunan(potongan()),
+            bangunan(
+              Text(toko.katalog.emoji, style: const TextStyle(fontSize: 22)),
+            ),
+            bangunan(
+              const Text(
+                TampilanData.emojiWarung,
+                style: TextStyle(fontSize: 64),
+              ),
             ),
             if (toko.punyaKasir)
               DenganGelembung(
@@ -241,7 +268,8 @@ class _BlokWarung extends StatelessWidget {
                   ],
                 ),
               ),
-            for (var i = 0; i < toko.ekspansi[Sisi.kanan]!; i++) potongan(),
+            for (var i = 0; i < toko.ekspansi[Sisi.kanan]!; i++)
+              bangunan(potongan()),
           ],
         ),
       ],
@@ -394,6 +422,7 @@ class _BarisAntrean extends StatelessWidget {
     required this.sisi,
     required this.ucapan,
     required this.onKetuk,
+    this.modeLapisan = false,
   });
 
   final SimulationEngine engine;
@@ -403,6 +432,7 @@ class _BarisAntrean extends StatelessWidget {
   /// pelangganId -> teks ucapan aktif.
   final Map<int, String> ucapan;
   final VoidCallback onKetuk;
+  final bool modeLapisan;
 
   @override
   Widget build(BuildContext context) {
@@ -420,7 +450,10 @@ class _BarisAntrean extends StatelessWidget {
                     terdepan: i == 0,
                     ucapan: ucapan[antre[i].id],
                     onKetuk: onKetuk,
+                    modeLapisan: modeLapisan,
                   )
+                : modeLapisan
+                ? const SizedBox.shrink()
                 : const _SlotKosong(),
           ),
         ),
@@ -461,12 +494,16 @@ class _FigurPelanggan extends StatelessWidget {
     required this.terdepan,
     required this.ucapan,
     required this.onKetuk,
+    this.modeLapisan = false,
   });
 
   final Pelanggan pelanggan;
   final bool terdepan;
   final String? ucapan;
   final VoidCallback onKetuk;
+
+  /// Emoji tidak terlihat (figur digambar Flame), area tap tetap.
+  final bool modeLapisan;
 
   @override
   Widget build(BuildContext context) {
@@ -501,7 +538,10 @@ class _FigurPelanggan extends StatelessWidget {
             _Balon(teks: balon)
           else
             const SizedBox(height: 22),
-          Text(p.tipe.emoji, style: const TextStyle(fontSize: 34)),
+          Opacity(
+            opacity: modeLapisan ? 0 : 1,
+            child: Text(p.tipe.emoji, style: const TextStyle(fontSize: 34)),
+          ),
           SizedBox(
             width: 40,
             child: LinearProgressIndicator(

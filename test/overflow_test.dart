@@ -9,6 +9,7 @@ import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/app.dart';
+import 'package:ngebul/ui/flame/warung_game_view.dart';
 
 import 'fake_random.dart';
 import 'helper.dart';
@@ -87,6 +88,7 @@ Future<void> _jalankan(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        sceneFlameProvider.overrideWithValue(false),
         simControllerProvider.overrideWith(
           () => SimController(
             jalankanLoop: false,

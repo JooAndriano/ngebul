@@ -9,6 +9,7 @@ import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/sim/sim_controller.dart';
 import 'package:ngebul/sim/simulation_engine.dart';
 import 'package:ngebul/ui/app.dart';
+import 'package:ngebul/ui/flame/warung_game_view.dart';
 import 'package:ngebul/ui/notif/notif_model.dart';
 import 'package:ngebul/ui/notif/notif_service.dart';
 import 'package:ngebul/ui/notif/toast_host.dart';
@@ -161,6 +162,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            sceneFlameProvider.overrideWithValue(false),
             simControllerProvider.overrideWith(
               () => SimController(
                 jalankanLoop: false,

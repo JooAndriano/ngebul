@@ -7,6 +7,7 @@ import '../data/ucapan_data.dart';
 import '../models/sim_types.dart';
 import '../sim/sim_controller.dart';
 import '../sim/simulation_engine.dart';
+import 'flame/warung_game_view.dart';
 import 'notif/notif_model.dart';
 import 'notif/notif_service.dart';
 import 'widgets/banner_ormas.dart';
@@ -200,6 +201,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final v = ref.watch(simControllerProvider);
     final t = v.toko;
+    final sceneFlame = ref.watch(sceneFlameProvider);
     final lebar = MediaQuery.sizeOf(context).width;
     _lebarPanel = (lebar * 0.6).clamp(320.0, 520.0);
 
@@ -213,13 +215,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            const Positioned.fill(
+            // Stage 2: scene Flame paling bawah, SceneWarung jadi lapisan
+            // interaksi (tap, balon, ucapan, kasir, ormas) di atasnya.
+            if (sceneFlame)
+              const Positioned.fill(
+                top: Hud.tinggi,
+                right: IkonTepi.lebar,
+                child: WarungGameView(),
+              ),
+            Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   top: Hud.tinggi,
                   right: IkonTepi.lebar,
                 ),
-                child: SceneWarung(),
+                child: SceneWarung(modeLapisan: sceneFlame),
               ),
             ),
             if (t.disegelPenuhHariIni)
