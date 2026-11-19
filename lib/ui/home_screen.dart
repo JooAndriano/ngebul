@@ -55,6 +55,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   NotifService get _notif => ref.read(notifServiceProvider);
 
+  @override
+  void initState() {
+    super.initState();
+    // Save dimuat di akhir hari (laporan belum ditutup): tampilkan lagi
+    // laporan agar pemain bisa tebus segel / lanjut ke hari berikutnya.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final e = ref.read(simControllerProvider).engineAtauNull;
+      if (e != null && e.hariSelesai) tampilkanDialogLaporan(context);
+    });
+  }
+
   void _bukaPanel(JenisPanel panel) {
     ref.read(simControllerProvider.notifier).bukaPanel(panel);
     _scaffoldKey.currentState?.openEndDrawer();

@@ -5,11 +5,14 @@ import 'dart:math' as math;
 
 import 'package:riverpod/riverpod.dart';
 
+import '../data/save/penyimpan_otomatis.dart';
+import '../data/save/save_store.dart';
 import '../data/sim_data.dart';
 import '../models/katalog.dart';
 import '../models/pesan_types.dart';
 import '../models/sim_types.dart';
 import '../models/toko.dart';
+import 'save/save_format.dart';
 import 'simulation_engine.dart';
 
 /// Panel samping (side sheet) yang bisa dibuka dari ikon tepi layar.
@@ -25,7 +28,11 @@ class SimView {
     required this.dijeda,
     required this.panel,
     required this.indeksToko,
+    this.jumlahTersimpan = 0,
   });
+
+  /// Naik setiap kali save berhasil ditulis (indikator "tersimpan").
+  final int jumlahTersimpan;
 
   /// Null = belum memilih jenis usaha.
   final SimulationEngine? engineAtauNull;
@@ -61,24 +68,60 @@ final simControllerProvider = NotifierProvider<SimController, SimView>(
 class SimController extends Notifier<SimView> {
   SimController({
     SimulationEngine Function(JenisUsaha jenis)? buatEngine,
+    SimulationEngine Function(Map<String, dynamic> data)? pulihkanEngine,
     this.jalankanLoop = true,
+    this.jedaSimpan = const Duration(seconds: 3),
+    this.jamSimpan,
   }) : _buatEngine =
-           buatEngine ?? ((jenis) => SimulationEngine(jenisUsaha: jenis));
+           buatEngine ?? ((jenis) => SimulationEngine(jenisUsaha: jenis)),
+       _pulihkanEngine = pulihkanEngine ?? SimulationEngine.dariSimpanan;
 
   final SimulationEngine Function(JenisUsaha jenis) _buatEngine;
+  final SimulationEngine Function(Map<String, dynamic> data) _pulihkanEngine;
   final bool jalankanLoop;
+
+  /// Debounce autosave: maksimal 1 penulisan per [jedaSimpan].
+  final Duration jedaSimpan;
+
+  /// Test: jam (epoch ms UTC) untuk savedAt / lastExitAt.
+  final int Function()? jamSimpan;
 
   SimulationEngine? _engine;
   Timer? _timer;
   final Stopwatch _stopwatch = Stopwatch();
   int _mikrodetikTerakhir = 0;
 
+  late PenyimpanOtomatis _penyimpan;
+  bool _hariSelesaiTerakhir = false;
+  String? _pesanMuat;
+
   SimulationEngine get _e => _engine!;
   String get _tokoId => state.toko.id;
 
+  /// Autosave (dibaca UI untuk "terakhir disimpan" & test).
+  PenyimpanOtomatis get penyimpan => _penyimpan;
+
+  /// Pesan satu kali tentang hasil memuat save (save rusak / versi lebih
+  /// baru). Null jika tidak ada. Dikosongkan setelah dibaca.
+  String? ambilPesanMuat() {
+    final p = _pesanMuat;
+    _pesanMuat = null;
+    return p;
+  }
+
   @override
   SimView build() {
-    _engine = null;
+    _penyimpan = PenyimpanOtomatis(
+      store: ref.read(saveStoreProvider),
+      jeda: jedaSimpan,
+      jam: jamSimpan,
+      onTersimpan: () {
+        if (ref.mounted) _perbarui(tersimpan: true);
+      },
+    )..sumber = () => _engine?.keJson();
+    ref.onDispose(_penyimpan.dispose);
+    _engine = _pulihkan(ref.read(muatanAwalProvider));
+    _hariSelesaiTerakhir = _engine?.hariSelesai ?? false;
     if (jalankanLoop) {
       _stopwatch
         ..reset()
@@ -90,14 +133,40 @@ class SimController extends Notifier<SimView> {
         _stopwatch.stop();
       });
     }
-    return const SimView(
-      engineAtauNull: null,
+    return SimView(
+      engineAtauNull: _engine,
       versi: 0,
       kecepatan: 1,
       dijeda: false,
       panel: null,
       indeksToko: 0,
     );
+  }
+
+  /// Bangun engine dari save saat app dibuka. Null = layar pilih usaha.
+  SimulationEngine? _pulihkan(HasilMuat m) {
+    _penyimpan.lastExitAt = m.lastExitAt;
+    switch (m.status) {
+      case StatusMuat.kosong:
+        return null;
+      case StatusMuat.rusak:
+        _pesanMuat = 'Data simpanan rusak. Memulai game baru.';
+        return null;
+      case StatusMuat.versiLebihBaru:
+        // Jangan timpa save dari versi lebih baru.
+        _penyimpan.terkunci = true;
+        _pesanMuat =
+            'Simpanan dibuat versi game yang lebih baru. Perbarui aplikasi; '
+            'progres sesi ini tidak disimpan.';
+        return null;
+      case StatusMuat.ok:
+        try {
+          return _pulihkanEngine(m.data!);
+        } catch (_) {
+          _pesanMuat = 'Data simpanan rusak. Memulai game baru.';
+          return null;
+        }
+    }
   }
 
   void _onTick() {
@@ -119,7 +188,13 @@ class SimController extends Notifier<SimView> {
     JenisPanel? panel,
     bool tutupPanel = false,
     int? indeksToko,
+    bool tersimpan = false,
   }) {
+    // Autosave di akhir hari (sekali per transisi ke hari selesai).
+    final selesai = _engine?.hariSelesai ?? false;
+    if (selesai && !_hariSelesaiTerakhir) _penyimpan.minta();
+    _hariSelesaiTerakhir = selesai;
+
     state = SimView(
       engineAtauNull: _engine,
       versi: state.versi + 1,
@@ -127,6 +202,7 @@ class SimController extends Notifier<SimView> {
       dijeda: dijeda ?? state.dijeda,
       panel: tutupPanel ? null : (panel ?? state.panel),
       indeksToko: indeksToko ?? state.indeksToko,
+      jumlahTersimpan: state.jumlahTersimpan + (tersimpan ? 1 : 0),
     );
   }
 
@@ -136,6 +212,28 @@ class SimController extends Notifier<SimView> {
     return hasil;
   }
 
+  /// Aksi penting (uang / upgrade / hari baru): autosave (debounce).
+  T _aksiPenting<T>(T Function() f) {
+    final hasil = _aksi(f);
+    _penyimpan.minta();
+    return hasil;
+  }
+
+  // Simpan
+  /// App tidak aktif (lifecycle inactive): autosave biasa (debounce).
+  void simpanSaatTidakAktif() => _penyimpan.minta();
+
+  /// App ke latar belakang (paused/hidden/detached): tulis sekarang dan
+  /// catat lastExitAt, karena proses bisa dibunuh OS.
+  Future<void> simpanSaatKeluar() => _penyimpan.segera(keluar: true);
+
+  /// Hapus save dan kembali ke layar pilih jenis usaha.
+  Future<void> mulaiGameBaru() async {
+    _engine = null;
+    _perbarui(indeksToko: 0, tutupPanel: true, dijeda: false);
+    await _penyimpan.hapus();
+  }
+
   // Awal permainan
   /// Mulai dengan toko pertama [jenis]; [nama] tidak valid diabaikan
   /// (toko memakai nama jenis usaha).
@@ -143,6 +241,7 @@ class SimController extends Notifier<SimView> {
     final e = _engine = _buatEngine(jenis);
     if (nama != null) e.ubahNamaToko(e.tokos.first.id, nama);
     _perbarui(indeksToko: 0, tutupPanel: true);
+    _penyimpan.minta();
   }
 
   /// Debug: kembali ke layar pilih jenis usaha.
@@ -176,14 +275,15 @@ class SimController extends Notifier<SimView> {
   Toko? bukaCabang(JenisUsaha jenis, Sisi sisi, {String? nama}) {
     final t = _e.bukaCabang(jenis, sisi, nama: nama);
     _perbarui(indeksToko: t == null ? null : _e.tokos.length - 1);
+    if (t != null) _penyimpan.minta();
     return t;
   }
 
   /// Ganti nama toko [tokoId]. Pesan error, atau null jika berhasil.
   String? ubahNamaToko(String tokoId, String nama) =>
-      _aksi(() => _e.ubahNamaToko(tokoId, nama));
+      _aksiPenting(() => _e.ubahNamaToko(tokoId, nama));
 
-  bool rekrutKasir() => _aksi(() => _e.rekrutKasir(_tokoId));
+  bool rekrutKasir() => _aksiPenting(() => _e.rekrutKasir(_tokoId));
 
   // Panel samping
   void bukaPanel(JenisPanel panel) => _perbarui(panel: panel);
@@ -201,14 +301,14 @@ class SimController extends Notifier<SimView> {
 
   // Kelola
   /// Naik/turun harga item satu step ([arah] = +1 atau -1).
-  void ubahHarga(String itemId, int arah) => _aksi(
+  void ubahHarga(String itemId, int arah) => _aksiPenting(
     () => _e.setHarga(
       _tokoId,
       itemId,
       state.toko.harga[itemId]! + arah * _e.config.stepHarga,
     ),
   );
-  void ubahHargaCombo(String comboId, int arah) => _aksi(
+  void ubahHargaCombo(String comboId, int arah) => _aksiPenting(
     () => _e.setHargaCombo(
       _tokoId,
       comboId,
@@ -216,32 +316,34 @@ class SimController extends Notifier<SimView> {
     ),
   );
   void setComboAktif(String comboId, bool aktif) =>
-      _aksi(() => _e.setComboAktif(_tokoId, comboId, aktif));
+      _aksiPenting(() => _e.setComboAktif(_tokoId, comboId, aktif));
   void aturHargaKategori(String kategoriId, int arah) =>
-      _aksi(() => _e.aturHargaKategori(_tokoId, kategoriId, arah));
+      _aksiPenting(() => _e.aturHargaKategori(_tokoId, kategoriId, arah));
   HasilIsiStok isiStok(String itemId, int jumlah) =>
-      _aksi(() => _e.isiStok(_tokoId, itemId, jumlah));
-  int isiSemuaMenipis() => _aksi(() => _e.isiSemuaMenipis(_tokoId));
+      _aksiPenting(() => _e.isiStok(_tokoId, itemId, jumlah));
+  int isiSemuaMenipis() => _aksiPenting(() => _e.isiSemuaMenipis(_tokoId));
   bool bukaKategori(String kategoriId) =>
-      _aksi(() => _e.bukaKategori(_tokoId, kategoriId));
-  bool bukaItem(String itemId) => _aksi(() => _e.bukaItem(_tokoId, itemId));
-  bool perluas(Sisi sisi) => _aksi(() => _e.perluas(_tokoId, sisi));
+      _aksiPenting(() => _e.bukaKategori(_tokoId, kategoriId));
+  bool bukaItem(String itemId) =>
+      _aksiPenting(() => _e.bukaItem(_tokoId, itemId));
+  bool perluas(Sisi sisi) => _aksiPenting(() => _e.perluas(_tokoId, sisi));
 
   // Ormas & segel
-  HasilOrmas bayarOrmas() => _aksi(() => _e.bayarOrmas(_tokoId));
-  HasilOrmas tawarOrmas() => _aksi(() => _e.tawarOrmas(_tokoId));
+  HasilOrmas bayarOrmas() => _aksiPenting(() => _e.bayarOrmas(_tokoId));
+  HasilOrmas tawarOrmas() => _aksiPenting(() => _e.tawarOrmas(_tokoId));
 
   /// Lapor Pak RT di toko fokus (sekali per kunjungan).
   HasilOrmas laporPakRT() => _aksi(() => _e.laporPakRT(_tokoId));
-  bool tebusSegel() => _aksi(() => _e.tebusSegel(_tokoId));
-  bool tebusSegelToko(String tokoId) => _aksi(() => _e.tebusSegel(tokoId));
+  bool tebusSegel() => _aksiPenting(() => _e.tebusSegel(_tokoId));
+  bool tebusSegelToko(String tokoId) =>
+      _aksiPenting(() => _e.tebusSegel(tokoId));
 
   // Pesan
   void bacaPesan(int id) => _aksi(() => _e.bacaPesan(id));
   bool jawabPesan(int id, JawabanPesan jawaban) =>
-      _aksi(() => _e.jawabPesan(id, jawaban));
+      _aksiPenting(() => _e.jawabPesan(id, jawaban));
 
-  void mulaiHariBaru() => _aksi(_e.mulaiHariBaru);
+  void mulaiHariBaru() => _aksiPenting(_e.mulaiHariBaru);
 
   // ------------------------------------------------------------ Debug
   void setKecepatan(double x) => _perbarui(kecepatan: x);
@@ -249,7 +351,7 @@ class SimController extends Notifier<SimView> {
   void setKasirOtomatis(bool aktif) =>
       _aksi(() => _e.setKasirOtomatis(_tokoId, aktif));
   void debugTambahUang(double jumlah) =>
-      _aksi(() => _e.debugTambahUang(jumlah));
+      _aksiPenting(() => _e.debugTambahUang(jumlah));
 
   /// [jenis] null = diundi berbobot.
   bool munculkanOrmas({JenisPemalak? jenis}) =>
@@ -262,7 +364,7 @@ class SimController extends Notifier<SimView> {
   void debugLewatiKeAkhirHari() => _aksi(() => _e.tick(_e.sisaDetikHari));
 
   /// Langsung ke hari berikutnya tanpa dialog laporan.
-  void debugKeHariBerikutnya() => _aksi(() {
+  void debugKeHariBerikutnya() => _aksiPenting(() {
     _e.tick(_e.sisaDetikHari);
     _e.mulaiHariBaru();
   });

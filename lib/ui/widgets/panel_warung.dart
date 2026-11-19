@@ -9,6 +9,7 @@ import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
 import 'dialog_toko.dart';
 import 'laporan_view.dart';
+import 'simpan_ui.dart';
 import 'ui_helper.dart';
 
 /// Daftar toko + buka cabang, lalu kasir, ekspansi lapak, status segel, dan
@@ -142,6 +143,8 @@ class PanelWarung extends ConsumerWidget {
         ),
         if (laporan != null)
           LaporanView(laporan: laporan, engine: e, tokoAwal: t.id),
+        const Divider(height: 24),
+        const KartuSimpanan(),
       ],
     );
   }

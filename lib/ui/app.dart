@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'notif/toast_host.dart';
 import 'pilih_usaha_screen.dart';
 import 'theme/ngebul_theme.dart';
+import 'widgets/simpan_ui.dart';
 
 class NgebulApp extends StatelessWidget {
   const NgebulApp({super.key});
@@ -18,15 +19,19 @@ class NgebulApp extends StatelessWidget {
       theme: NgebulTheme.buat(),
       // Toast di atas Navigator: tampil di atas sidebar, dialog, dan
       // bottom sheet.
-      builder: (context, child) =>
-          Stack(fit: StackFit.expand, children: [child!, const ToastHost()]),
-      home: Consumer(
-        builder: (context, ref, _) {
-          final belumMulai = ref.watch(
-            simControllerProvider.select((v) => v.engineAtauNull == null),
-          );
-          return belumMulai ? const PilihUsahaScreen() : const HomeScreen();
-        },
+      builder: (context, child) => Stack(
+        fit: StackFit.expand,
+        children: [child!, const ToastHost(), const IndikatorSimpan()],
+      ),
+      home: PenjagaSimpan(
+        child: Consumer(
+          builder: (context, ref, _) {
+            final belumMulai = ref.watch(
+              simControllerProvider.select((v) => v.engineAtauNull == null),
+            );
+            return belumMulai ? const PilihUsahaScreen() : const HomeScreen();
+          },
+        ),
       ),
     );
   }

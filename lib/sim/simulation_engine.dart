@@ -9,6 +9,7 @@
 // - engine_pemalak.dart: jenis pemalak, Lapor Pak RT
 // - engine_alert.dart  : alert, ucapan komik, efek komik
 // - engine_pesan.dart  : pesan SMS
+// - engine_simpan.dart : serialisasi save (keJson / dariSimpanan)
 library;
 
 import 'dart:collection';
@@ -18,7 +19,9 @@ import '../core/nama_validator.dart';
 import '../data/sim_data.dart';
 import '../data/ucapan_data.dart';
 import '../models/game_state.dart';
+import '../models/json_baca.dart';
 import '../models/katalog.dart';
+import '../models/model_json.dart';
 import '../models/pesan_types.dart';
 import '../models/pesanan.dart';
 import '../models/sim_config.dart';
@@ -34,6 +37,7 @@ part 'engine_layani.dart';
 part 'engine_ormas.dart';
 part 'engine_pemalak.dart';
 part 'engine_pesan.dart';
+part 'engine_simpan.dart';
 part 'engine_toko.dart';
 part 'engine_usaha.dart';
 
@@ -56,6 +60,7 @@ class SimulationEngine {
     _s = GameState(uang: k.uangAwal, tokos: []);
     _pembuatPesan = PembuatPesan(this.config, _random);
     _pembuatPesanan = PembuatPesanan(this.config, _random);
+    jenisUsahaAwal = jenisUsaha;
     // Nama tidak valid -> nama jenis usaha.
     final cek = NamaValidator.periksa(namaToko ?? '');
     _buatToko(
@@ -67,7 +72,30 @@ class SimulationEngine {
     _mulaiHari();
   }
 
+  /// Pulihkan engine dari data save ([SimpanEngine.keJson]). Field hilang /
+  /// enum tidak dikenal memakai default. Hari dilanjutkan dari jam yang
+  /// tersimpan, tanpa pelanggan di antrean (lihat docs/SAVE.md). Melempar
+  /// [FormatException] jika data tidak berisi satu toko pun.
+  SimulationEngine.dariSimpanan(
+    Json data, {
+    SimConfig? config,
+    math.Random? random,
+    math.Random? randomUcapan,
+    this.kedatanganOtomatis = true,
+    this.jadwalAcakHarian = true,
+    this.jenisPemalakPaksa,
+  }) : config = config ?? simConfigDefault,
+       _random = random ?? math.Random(),
+       _randomUcapan = randomUcapan ?? math.Random() {
+    _pembuatPesan = PembuatPesan(this.config, _random);
+    _pembuatPesanan = PembuatPesanan(this.config, _random);
+    _terapkanSimpanan(data);
+  }
+
   final SimConfig config;
+
+  /// Jenis usaha yang dipilih saat mulai game (jenis toko utama).
+  late final JenisUsaha jenisUsahaAwal;
   final math.Random _random;
   final math.Random _randomUcapan;
   late final PembuatPesan _pembuatPesan;
