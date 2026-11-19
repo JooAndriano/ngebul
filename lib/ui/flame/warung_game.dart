@@ -5,27 +5,59 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/sim_types.dart';
+import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
+import 'fase_pelanggan.dart';
+import 'hiasan_pelanggan.dart';
 import 'pelanggan_walker.dart';
 import 'tata_letak.dart';
 
-/// Lapisan visual Stage 2. Hanya MEMBACA `Toko` (lewat [tokoFokus]) dan tidak
-/// pernah memutasi state. Tiap frame ia membandingkan antrean di engine
-/// dengan walker yang ada:
+/// Penghubung scene Flame ke state engine. Scene hanya MEMBACA lewat ini,
+/// dan aksi pemain diteruskan ke SimController (sama dengan scene lama).
+abstract interface class SumberScene {
+  /// Toko yang sedang difokuskan (null = belum ada engine/toko).
+  Toko? tokoFokus();
+
+  /// Jumlah slot antrean [sisi] (memperhitungkan ekspansi).
+  int kapasitasAntrean(Toko toko, Sisi sisi);
+
+  /// Ucapan aktif semua toko (scene menyaring toko fokus & pelanggan).
+  Iterable<UcapanEvent> ucapanAktif();
+
+  TipePelangganData? tipe(String id);
+
+  /// Pelanggan terdepan [sisi] diketuk: buka panel Layani.
+  void ketukPelanggan(Sisi sisi);
+}
+
+/// Lapisan visual Stage 2. Tidak pernah memutasi state. Tiap frame ia
+/// membandingkan antrean di engine dengan walker yang ada:
 ///   - id baru di antrean   -> walker muncul dari tepi layar lalu jalan ke slot
-///   - id hilang di antrean -> walker jalan keluar layar lalu dihapus
+///   - id hilang di antrean -> walker jalan keluar (lebih cepat jika kabur)
 ///   - antrean maju         -> walker geser ke slot barunya
+/// Ucapan pelanggan tampil di atas walker-nya. Pelanggan yang tidak sempat
+/// antre (mahal, antrean penuh) tampil sebagai pelintas.
 class WarungGame extends FlameGame {
-  WarungGame({required this.tokoFokus, this.kapasitasAntrean});
+  WarungGame({required this.sumber});
 
-  /// Satu-satunya titik sambung ke state engine.
-  final Toko? Function() tokoFokus;
+  final SumberScene sumber;
 
-  /// Jumlah slot antrean per sisi (memperhitungkan ekspansi). Null = pakai
-  /// panjang antrean saat ini.
-  final int Function(Toko toko, Sisi sisi)? kapasitasAntrean;
-
+  /// Walker yang sedang di antrean.
   final Map<int, PelangganWalker> _walkers = {};
+
+  /// Walker yang sedang berjalan keluar (dan pelintas), agar ucapannya
+  /// tetap menempel sampai ia hilang dari layar.
+  final Map<int, PelangganWalker> _keluar = {};
+
+  /// Status terakhir pelanggan di antrean (untuk cara pergi).
+  final Map<int, StatusPelanggan> _statusTerakhir = {};
+
+  /// Ucapan pelanggan tanpa walker (mis. setelah ganti toko).
+  final Map<int, _UcapanMelayang> _melayang = {};
+
+  /// Ucapan pelintas yang sudah dibuatkan walker.
+  final Set<int> _ucapanDitangani = {};
+
   TataLetakScene _tata = const TataLetakScene(0, 0);
 
   /// Toko yang sedang ditampilkan. Dibandingkan per objek (bukan id) agar
@@ -53,29 +85,66 @@ class WarungGame extends FlameGame {
   @override
   void update(double dt) {
     super.update(dt);
-    _sinkron(tokoFokus());
+    _sinkron(sumber.tokoFokus());
   }
 
-  void _hapusSemuaWalker() {
+  void _hapusSemua() {
     for (final w in children.whereType<PelangganWalker>().toList()) {
       w.removeFromParent();
     }
+    for (final m in _melayang.values) {
+      m.removeFromParent();
+    }
     _walkers.clear();
+    _keluar.clear();
+    _statusTerakhir.clear();
+    _melayang.clear();
+    _ucapanDitangani.clear();
+  }
+
+  PelangganWalker _buatWalker(
+    int id,
+    String emoji,
+    Sisi sisi, {
+    required double x,
+  }) {
+    final w = PelangganWalker(
+      pelangganId: id,
+      emoji: emoji,
+      sisi: sisi,
+      ukuran: _tata.ukuranPelanggan,
+      x: x,
+      yKaki: _tata.yKaki,
+      kecepatan: _tata.kecepatan,
+      onKetuk: sumber.ketukPelanggan,
+    );
+    add(w);
+    return w;
   }
 
   void _sinkron(Toko? t) {
     if (t == null) {
-      if (_toko != null) _hapusSemuaWalker();
+      if (_toko != null) _hapusSemua();
       _toko = null;
       return;
     }
     if (!_tata.valid) return;
 
+    final ucapan = [
+      for (final u in sumber.ucapanAktif())
+        if (u.tokoId == t.id &&
+            u.sumber == SumberUcapan.pelanggan &&
+            u.pelangganId != null)
+          u,
+    ];
+
     // Ganti toko fokus: bersihkan semua, pelanggan langsung berdiri di slot.
+    // Ucapan pelintas yang sudah berjalan tidak dibuatkan walker.
     final ganti = !identical(_toko, t);
     if (ganti) {
-      _hapusSemuaWalker();
+      _hapusSemua();
       _toko = t;
+      _ucapanDitangani.addAll(ucapan.map((u) => u.id));
     }
     final snap = ganti || _perluSnap;
     if (_perluSnap) {
@@ -89,47 +158,115 @@ class WarungGame extends FlameGame {
       _perluSnap = false;
     }
 
+    // Ucapan per pelanggan (engine: maks 1 aktif per pelanggan).
+    final ucapanPer = {for (final u in ucapan) u.pelangganId!: u};
+
+    // Antrean -> walker.
     final aktif = <int>{};
     for (final sisi in Sisi.values) {
       final daftar = t.antrean[sisi] ?? const <Pelanggan>[];
       final kapasitas = math.max(
         daftar.length,
-        kapasitasAntrean?.call(t, sisi) ?? 0,
+        sumber.kapasitasAntrean(t, sisi),
       );
       for (var i = 0; i < daftar.length; i++) {
         final p = daftar[i];
         aktif.add(p.id);
         final tx = _tata.slotX(sisi, i, kapasitas: kapasitas);
-        var w = _walkers[p.id];
-        if (w == null) {
-          w = PelangganWalker(
-            pelangganId: p.id,
-            emoji: p.tipe.emoji,
-            sisi: sisi,
-            ukuran: _tata.ukuranPelanggan,
-            x: ganti ? tx : _tata.tepiX(sisi),
-            yKaki: _tata.yKaki,
-            kecepatan: _tata.kecepatan,
-          );
-          _walkers[p.id] = w;
-          add(w);
-        }
+        final w = _walkers[p.id] ??= _buatWalker(
+          p.id,
+          p.tipe.emoji,
+          sisi,
+          x: ganti ? tx : _tata.tepiX(sisi),
+        );
         if (snap) {
           w.lompatKe(tx);
         } else {
           w.tujuan(tx);
         }
+        w.aturStatus(
+          status: p.status,
+          terdepan: i == 0,
+          fraksiKesabaran: p.fraksiKesabaran,
+        );
+        _statusTerakhir[p.id] = p.status;
       }
     }
 
     // Pelanggan yang sudah tidak ada di antrean: jalan keluar.
     for (final id in _walkers.keys.toList()) {
-      if (!aktif.contains(id)) {
-        final w = _walkers.remove(id)!;
-        w.pergi(_tata.tepiX(w.sisi));
-      }
+      if (aktif.contains(id)) continue;
+      final w = _walkers.remove(id)!;
+      final cara = caraPergi(
+        ucapanTerakhir: ucapanPer[id]?.situasi,
+        statusTerakhir: _statusTerakhir.remove(id),
+      );
+      w.pergi(_tata.tepiX(w.sisi), marah: cara == CaraPergi.kabur);
+      _keluar[id] = w;
     }
+    _keluar.removeWhere((_, w) => w.isRemoving || w.isRemoved);
+
+    // Pelintas: pelanggan yang tidak sempat antre (ucapan tanpa sisi).
+    for (final u in ucapan) {
+      final id = u.pelangganId!;
+      if (u.sisi != null || _ucapanDitangani.contains(u.id)) continue;
+      if (_walkers.containsKey(id) || _keluar.containsKey(id)) continue;
+      _ucapanDitangani.add(u.id);
+      final tipe = u.tipeId == null ? null : sumber.tipe(u.tipeId!);
+      if (tipe == null) continue;
+      final sisi = id.isEven ? Sisi.kiri : Sisi.kanan;
+      final xTujuan = sisi == Sisi.kiri ? _tata.lebar * 0.1 : _tata.lebar * 0.9;
+      _keluar[id] = _buatWalker(id, tipe.emoji, sisi, x: _tata.tepiX(sisi))
+        ..lewat(xTujuan, _tata.tepiX(sisi));
+    }
+
+    // Ucapan -> walker (di antrean atau sedang keluar). Sisanya melayang.
+    final masihAda = <int>{};
+    for (final w in [..._walkers.values, ..._keluar.values]) {
+      final u = ucapanPer[w.pelangganId];
+      w.aturUcapan(u?.teks, alpha: u == null ? 0 : _alphaUcapan(u));
+    }
+    for (final u in ucapan) {
+      final id = u.pelangganId!;
+      if (_walkers.containsKey(id) || _keluar.containsKey(id)) continue;
+      if (u.sisi == null) continue; // pelintas tanpa tipe: dilewati
+      masihAda.add(u.id);
+      final m = _melayang[u.id] ??= _buatMelayang(u.sisi!);
+      m.ucapan.atur(
+        u.teks,
+        alpha: _alphaUcapan(u),
+        ukuranFont: math.max(11, _tata.ukuranPelanggan * 0.27),
+        maksLebar: _tata.ukuranPelanggan * 2.6,
+      );
+    }
+    for (final id in _melayang.keys.toList()) {
+      if (!masihAda.contains(id)) _melayang.remove(id)!.removeFromParent();
+    }
+    _ucapanDitangani.removeWhere((id) => !ucapan.any((u) => u.id == id));
   }
+
+  /// Fade-out pada 0,4 detik terakhir ucapan.
+  double _alphaUcapan(UcapanEvent u) => (u.sisaDetik / 0.4).clamp(0.0, 1.0);
+
+  _UcapanMelayang _buatMelayang(Sisi sisi) {
+    final m = _UcapanMelayang()
+      ..position.setValues(
+        _tata.slotX(sisi, 0),
+        _tata.yKaki - _tata.ukuranPelanggan * 1.2,
+      )
+      ..priority = 5;
+    add(m);
+    return m;
+  }
+}
+
+/// Ucapan pelanggan yang walker-nya sudah tidak ada (mis. baru ganti toko):
+/// tampil di dekat antrean sisinya.
+class _UcapanMelayang extends PositionComponent {
+  final UcapanKomik ucapan = UcapanKomik();
+
+  @override
+  Future<void> onLoad() async => add(ucapan);
 }
 
 /// Latar + bangunan warung, digambar dengan blok persegi (gaya pixel).

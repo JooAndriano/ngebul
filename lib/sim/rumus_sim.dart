@@ -143,9 +143,18 @@ abstract final class RumusSim {
     return wajar <= 0 ? 1 : jual / wajar;
   }
 
-  /// Kesabaran total = dasar + 2.5 x total unit.
-  static double kesabaranTotal(SimConfig c, double dasar, int totalUnit) =>
-      dasar + c.kesabaranPerUnit * totalUnit;
+  /// Skala kesabaran tipe = kesabaranDasar / acuan (tipe acuan = 1).
+  static double skalaKesabaran(SimConfig c, double dasar) =>
+      c.kesabaranDasarAcuan <= 0 ? 1 : dasar / c.kesabaranDasarAcuan;
+
+  /// Kesabaran fase antre = 120 x skala.
+  static double kesabaranAntre(SimConfig c, double dasar) =>
+      c.kesabaranAntre * skalaKesabaran(c, dasar);
+
+  /// Kesabaran fase layani = 60 x skala + 2,5 x (unit - 1).
+  static double kesabaranLayani(SimConfig c, double dasar, int totalUnit) =>
+      c.kesabaranLayani * skalaKesabaran(c, dasar) +
+      c.kesabaranPerUnit * math.max(0, totalUnit - 1);
 
   /// Rating dari sisa kesabaran (pecahan 0..1).
   static RatingConfig rating(SimConfig c, double fraksiKesabaran) {

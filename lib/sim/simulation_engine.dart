@@ -221,13 +221,10 @@ class SimulationEngine {
       id: ++_idPelanggan,
       tipe: tipe,
       pesanan: pesanan,
-      kesabaranAwal: RumusSim.kesabaranTotal(
-        config,
-        tipe.kesabaranDasar,
-        pesanan.totalUnit,
-      ),
+      kesabaranAwal: RumusSim.kesabaranAntre(config, tipe.kesabaranDasar),
     );
     t.antrean[sisi]!.add(p);
+    _majukanFaseKesabaran(t);
     _ucapPelanggan(t, p, SituasiUcapan.sapaan, sisi: sisi);
   }
 
@@ -342,6 +339,7 @@ class SimulationEngine {
   }
 
   void _langkahToko(Toko t, double dt) {
+    _majukanFaseKesabaran(t);
     // Pelanggan: kesabaran turun (juga saat dilayani), 🚫 menghilang.
     for (final e in t.antrean.entries) {
       final pergi = <Pelanggan>[];
@@ -363,6 +361,7 @@ class SimulationEngine {
       }
       e.value.removeWhere(pergi.contains);
     }
+    _majukanFaseKesabaran(t);
 
     // Kedatangan (proses Poisson dengan laju yang bisa berubah).
     if (kedatanganOtomatis && _bisaMelayani(t)) {
@@ -387,8 +386,28 @@ class SimulationEngine {
     if (t.punyaKasir && _bisaMelayani(t)) _langkahKasir(t, dt);
   }
 
+  /// Pelanggan terdepan tiap sisi masuk fase layani: kesabaran diganti
+  /// kesabaran layani (penuh), ucapan sabar bisa terucap lagi. Fase antre
+  /// tidak berlanjut ke fase layani (sisa kesabaran antre tidak dibawa).
+  void _majukanFaseKesabaran(Toko t) {
+    for (final antre in t.antrean.values) {
+      if (antre.isEmpty) continue;
+      final p = antre.first;
+      if (p.diDepan) continue;
+      p.diDepan = true;
+      p.kesabaranAwal = RumusSim.kesabaranLayani(
+        config,
+        p.tipe.kesabaranDasar,
+        p.pesanan.totalUnit,
+      );
+      p.sisaKesabaran = p.kesabaranAwal;
+      p.sabar1Terucap = false;
+      p.sabar2Terucap = false;
+    }
+  }
+
   /// Ucapan "Mana nih?" (< 60%) dan "Woy, cepetan!" (< 30%), masing-masing
-  /// sekali per pelanggan.
+  /// sekali per fase kesabaran.
   void _cekUcapanSabar(Toko t, Pelanggan p, Sisi sisi) {
     final f = p.fraksiKesabaran;
     if (f < config.ambangUcapanSabar2 && !p.sabar2Terucap) {

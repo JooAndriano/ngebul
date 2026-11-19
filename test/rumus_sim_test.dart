@@ -89,9 +89,34 @@ void main() {
     });
   });
 
-  test('kesabaran total = dasar + 2,5 x unit', () {
-    expect(RumusSim.kesabaranTotal(c, 18, 4), 28);
-    expect(RumusSim.kesabaranTotal(c, 20, 1), 22.5);
+  test('kesabaran antre = 120 x dasar/18', () {
+    expect(RumusSim.kesabaranAntre(c, 18), 120);
+    expect(RumusSim.kesabaranAntre(c, 27), 180);
+    expect(RumusSim.kesabaranAntre(c, 9), 60);
+  });
+
+  test('kesabaran layani = 60 x dasar/18 + 2,5 x (unit - 1)', () {
+    expect(RumusSim.kesabaranLayani(c, 18, 1), 60);
+    expect(RumusSim.kesabaranLayani(c, 18, 4), 67.5);
+    expect(RumusSim.kesabaranLayani(c, 9, 1), 30);
+    expect(RumusSim.kesabaranLayani(c, 18, 0), 60); // tanpa unit: tidak minus
+  });
+
+  test('perbandingan antar tipe tetap: lebih sabar tetap lebih sabar', () {
+    final tipe = [...c.tipePelanggan]
+      ..sort((a, b) => a.kesabaranDasar.compareTo(b.kesabaranDasar));
+    for (var i = 1; i < tipe.length; i++) {
+      final a = tipe[i - 1].kesabaranDasar;
+      final b = tipe[i].kesabaranDasar;
+      expect(
+        RumusSim.kesabaranAntre(c, b) / RumusSim.kesabaranAntre(c, a),
+        closeTo(b / a, 1e-9),
+      );
+      expect(
+        RumusSim.kesabaranLayani(c, b, 1) / RumusSim.kesabaranLayani(c, a, 1),
+        closeTo(b / a, 1e-9),
+      );
+    }
   });
 
   test('rating kecepatan: >=0,6 Kilat, 0,3-0,6 Lancar, <0,3 Mepet', () {

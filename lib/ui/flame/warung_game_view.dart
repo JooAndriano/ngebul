@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/sim_types.dart';
+import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
@@ -17,7 +18,7 @@ const bool pakaiSceneFlame = true;
 final sceneFlameProvider = Provider<bool>((_) => pakaiSceneFlame);
 
 /// Pembungkus Flame. Ditaruh di dalam Stack di home_screen, DI BAWAH widget
-/// overlay yang sudah ada (hud, gelembung, banner ormas, toast, dst).
+/// overlay yang sudah ada (hud, banner ormas, toast, dst).
 class WarungGameView extends ConsumerStatefulWidget {
   const WarungGameView({super.key});
 
@@ -25,33 +26,46 @@ class WarungGameView extends ConsumerStatefulWidget {
   ConsumerState<WarungGameView> createState() => _WarungGameViewState();
 }
 
-class _WarungGameViewState extends ConsumerState<WarungGameView> {
+class _WarungGameViewState extends ConsumerState<WarungGameView>
+    implements SumberScene {
   late final WarungGame _game;
 
   @override
   void initState() {
     super.initState();
-    _game = WarungGame(
-      tokoFokus: _ambilTokoFokus,
-      kapasitasAntrean: _kapasitas,
-    );
+    _game = WarungGame(sumber: this);
   }
 
-  /// Toko yang sedang difokuskan, atau null jika belum ada engine/toko.
-  /// Dibaca tiap frame oleh game; tidak perlu rebuild widget per tick.
-  Toko? _ambilTokoFokus() {
-    final v = ref.read(simControllerProvider);
+  // Dibaca tiap frame oleh game; tidak perlu rebuild widget per tick.
+  SimView get _v => ref.read(simControllerProvider);
+
+  @override
+  Toko? tokoFokus() {
+    final v = _v;
     final daftar = v.engineAtauNull?.tokos;
     if (daftar == null || daftar.isEmpty) return null;
     return daftar[v.indeksToko.clamp(0, daftar.length - 1)];
   }
 
-  int _kapasitas(Toko t, Sisi sisi) =>
-      ref
-          .read(simControllerProvider)
-          .engineAtauNull
-          ?.kapasitasAntrean(t.id, sisi) ??
-      0;
+  @override
+  int kapasitasAntrean(Toko toko, Sisi sisi) =>
+      _v.engineAtauNull?.kapasitasAntrean(toko.id, sisi) ?? 0;
+
+  @override
+  Iterable<UcapanEvent> ucapanAktif() =>
+      _v.engineAtauNull?.ucapanAktif ?? const [];
+
+  @override
+  TipePelangganData? tipe(String id) => _v.engineAtauNull?.config.tipePelanggan
+      .where((t) => t.id == id)
+      .firstOrNull;
+
+  /// Sama dengan tap pelanggan terdepan di scene lama.
+  @override
+  void ketukPelanggan(Sisi sisi) {
+    if (!mounted) return;
+    ref.read(simControllerProvider.notifier).bukaLayani(sisi);
+  }
 
   @override
   Widget build(BuildContext context) => GameWidget(game: _game);

@@ -11,7 +11,8 @@ void main() {
   group('ormas (per toko)', () {
     test('kemarahan naik -> peringatan -> segel', () {
       final e = buatEngine();
-      datang(e, pesananItem({'es_teh': 1}));
+      // Pekerja 1 unit: kesabaran 46,7 dtk, habis sebelum segel (60 dtk).
+      datang(e, pesananItem({'es_teh': 1}), tipeId: 'pekerja');
       final interval = e.intervalKedatanganRataRata(toko1);
       expect(e.munculkanOrmas(toko1), isTrue);
       expect(e.munculkanOrmas(toko1), isFalse);

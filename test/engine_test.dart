@@ -107,10 +107,10 @@ void main() {
   });
 
   group('kedatangan & antrean', () {
-    test('kesabaran total = dasar + 2,5 x unit', () {
+    test('kesabaran di depan = 60 x dasar/18 + 2,5 x (unit - 1)', () {
       final e = buatEngine();
       datang(e, pesananItem({'es_teh': 2, 'gorengan': 2}), tipeId: 'irt');
-      expect(e.antrean(toko1, Sisi.kiri).single.kesabaranAwal, 28);
+      expect(e.antrean(toko1, Sisi.kiri).single.kesabaranAwal, 67.5);
     });
 
     test('mahal: pergi berdasarkan rasio pesanan', () {
@@ -159,8 +159,8 @@ void main() {
 
     test('kesabaran habis -> antre lama, reputasi -0,8', () {
       final e = buatEngine();
-      datang(e, pesananItem({'es_teh': 1})); // 22,5 dtk
-      e.tick(22.4);
+      datang(e, pesananItem({'es_teh': 1})); // pelajar di depan: 66,7 dtk
+      e.tick(66.6);
       expect(e.antrean(toko1, Sisi.kiri), hasLength(1));
       e.tick(0.2);
       expect(e.antrean(toko1, Sisi.kiri), isEmpty);

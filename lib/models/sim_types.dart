@@ -48,14 +48,20 @@ class Pelanggan {
   final int id;
   final TipePelangganData tipe;
   final Pesanan pesanan;
-  final double kesabaranAwal;
+
+  /// Kesabaran penuh fase saat ini (fase antre, lalu fase layani setelah
+  /// [diDepan]). Hanya diubah engine.
+  double kesabaranAwal;
   double sisaKesabaran;
   StatusPelanggan status = StatusPelanggan.menunggu;
+
+  /// Sudah berada di depan antrean (fase layani). Hanya diubah engine.
+  bool diDepan = false;
 
   /// Hitung mundur sebelum pergi (status pergiStokHabis).
   double sisaTampil = 0;
 
-  /// Ucapan kesabaran (< 60% / < 30%) hanya sekali per pelanggan.
+  /// Ucapan kesabaran (< 60% / < 30%) hanya sekali per fase kesabaran.
   bool sabar1Terucap = false;
   bool sabar2Terucap = false;
 

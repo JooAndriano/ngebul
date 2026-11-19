@@ -86,9 +86,9 @@ void main() {
 
       test('salah ambil terus sampai kesabaran habis -> pergi', () {
         final e = buatEngine();
-        datang(e, pesananItem({'es_teh': 1})); // pelajar: 22,5 dtk
+        datang(e, pesananItem({'es_teh': 1})); // pelajar: 66,7 dtk
         e.bukaLayani(toko1, Sisi.kiri);
-        for (var i = 0; i < 16; i++) {
+        for (var i = 0; i < 45; i++) {
           e.ambil(toko1, 'gorengan');
         }
         e.tick(0.1);
@@ -114,9 +114,9 @@ void main() {
 
     test('kesabaran tetap turun saat panel terbuka; habis -> panel tutup', () {
       final e = buatEngine();
-      datang(e, pesananItem({'es_teh': 1})); // 22,5 dtk
+      datang(e, pesananItem({'es_teh': 1})); // 66,7 dtk
       e.bukaLayani(toko1, Sisi.kiri);
-      e.tick(22.4);
+      e.tick(66.6);
       expect(e.sesiLayani(toko1), isNotNull);
       e.tick(0.2);
       expect(e.sesiLayani(toko1), isNull);
@@ -126,7 +126,7 @@ void main() {
   });
 
   group('tip & reputasi per rating', () {
-    // Pelajar 1 unit: kesabaran 22,5 dtk.
+    // Pelajar 1 unit di depan: kesabaran 60 x 20/18 = 66,7 dtk.
     (HasilLayani, double) layaniSetelah(double detik) {
       final e = buatEngine();
       datang(e, pesananItem({'nasi_goreng': 1}));
@@ -137,7 +137,7 @@ void main() {
     }
 
     test('Kilat (>= 0,6): tip 15%, reputasi +0,6', () {
-      final (h, dRep) = layaniSetelah(5); // 0,78
+      final (h, dRep) = layaniSetelah(15); // 0,78
       expect(h.rating, RatingKecepatan.kilat);
       expect(h.total, 15000);
       expect(h.tip, closeTo(2250, 1e-9));
@@ -145,14 +145,14 @@ void main() {
     });
 
     test('Lancar (0,3-0,6): tip 5%, reputasi +0,3', () {
-      final (h, dRep) = layaniSetelah(10); // 0,56
+      final (h, dRep) = layaniSetelah(30); // 0,55
       expect(h.rating, RatingKecepatan.lancar);
       expect(h.tip, closeTo(750, 1e-9));
       expect(dRep, closeTo(0.3, 1e-9));
     });
 
     test('Mepet (< 0,3): tanpa tip, reputasi +0,1', () {
-      final (h, dRep) = layaniSetelah(16); // 0,29
+      final (h, dRep) = layaniSetelah(47); // 0,295
       expect(h.rating, RatingKecepatan.mepet);
       expect(h.tip, 0);
       expect(dRep, closeTo(0.1, 1e-9));

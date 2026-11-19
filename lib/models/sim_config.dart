@@ -222,6 +222,9 @@ class SimConfig {
     required this.stokAwal,
     required this.ambangStokMenipis,
     required this.ambangAlertStokMenipis,
+    required this.kesabaranAntre,
+    required this.kesabaranLayani,
+    required this.kesabaranDasarAcuan,
     required this.kesabaranPerUnit,
     required this.penaltiSalahAmbil,
     required this.rating,
@@ -300,8 +303,22 @@ class SimConfig {
   /// Alert stok menipis: stok <= pecahan ini x kapasitas.
   final double ambangAlertStokMenipis;
 
+  // Kesabaran dua fase (detik, tipe acuan):
+  // 1. antre: dari datang sampai berada di depan antrean;
+  // 2. layani: dari berada di depan sampai pesanan diberikan.
+  // Tipe lain diskalakan kesabaranDasar / kesabaranDasarAcuan.
+
+  /// Kesabaran fase antre untuk tipe acuan.
+  final double kesabaranAntre;
+
+  /// Kesabaran fase layani untuk tipe acuan dengan pesanan 1 unit.
+  final double kesabaranLayani;
+
+  /// kesabaranDasar tipe "rata-rata" (skala 1).
+  final double kesabaranDasarAcuan;
+
   // Pick & pack
-  /// Kesabaran total = dasar tipe + ini x total unit pesanan.
+  /// Tambahan kesabaran fase layani per unit pesanan setelah unit pertama.
   final double kesabaranPerUnit;
 
   /// Kesabaran berkurang sekian detik tiap salah ambil.

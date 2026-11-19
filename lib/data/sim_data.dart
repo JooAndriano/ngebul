@@ -37,6 +37,11 @@ final SimConfig simConfigDefault = SimConfig(
   stokAwal: 5,
   ambangStokMenipis: 0.2,
   ambangAlertStokMenipis: 0.15,
+  // Detik nyata pada kecepatan 1x untuk tipe acuan (IRT, kesabaranDasar 18;
+  // rata-rata tertimbang bobot katalog ~18).
+  kesabaranAntre: 120,
+  kesabaranLayani: 60,
+  kesabaranDasarAcuan: 18,
   kesabaranPerUnit: 2.5,
   penaltiSalahAmbil: 1.5,
   rating: const [

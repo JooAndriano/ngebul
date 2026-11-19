@@ -121,6 +121,7 @@ extension LayaniEngine on SimulationEngine {
     if (s == null || !adaBarisKurangStok(tokoId)) return false;
     t.antrean[s.sisi]!.remove(s.pelanggan);
     t.sesiLayani = null;
+    _majukanFaseKesabaran(t);
     t.stat.ditolak++;
     _pergi(t, s.pelanggan.tipe, AlasanPergi.stokHabis, config.reputasiTolak);
     _ucapPelanggan(t, s.pelanggan, SituasiUcapan.tolakStok, sisi: s.sisi);
@@ -149,6 +150,7 @@ extension LayaniEngine on SimulationEngine {
     final p = s.pelanggan;
     t.antrean[s.sisi]!.remove(p);
     t.sesiLayani = null;
+    _majukanFaseKesabaran(t);
 
     final r = RumusSim.rating(config, p.fraksiKesabaran);
     final total = _jual(t, baris);
@@ -264,6 +266,7 @@ extension LayaniEngine on SimulationEngine {
       return;
     }
     t.antrean[sisi]!.remove(p);
+    _majukanFaseKesabaran(t);
     final r = RumusSim.rating(config, p.fraksiKesabaran);
     final total = _jual(t, p.pesanan.baris);
     t.stat.dilayaniKasir++;

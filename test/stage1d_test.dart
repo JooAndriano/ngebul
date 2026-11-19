@@ -163,7 +163,7 @@ void main() {
       final kiri = e.antrean(toko1, Sisi.kiri).single;
       final kanan = e.antrean(toko1, Sisi.kanan).single;
       e.tick(0.1);
-      expect(kanan.status, StatusPelanggan.diprosesKasir); // 16,5 < 22,5
+      expect(kanan.status, StatusPelanggan.diprosesKasir); // 46,7 < 66,7
       expect(kiri.status, StatusPelanggan.menunggu);
       // Pelanggan yang diproses kasir tidak bisa diketuk pemain.
       expect(e.bukaLayani(toko1, Sisi.kanan), isNull);
@@ -459,10 +459,10 @@ void main() {
   group('ucapan komik', () {
     test('tiap tingkat kesabaran hanya sekali per pelanggan', () {
       final e = buatEngine();
-      datang(e, pesananItem({'es_teh': 1})); // kesabaran 22,5
+      datang(e, pesananItem({'es_teh': 1})); // kesabaran 66,7 (di depan)
       final p = e.antrean(toko1, Sisi.kiri).single;
       expect(ucapanPelanggan(e, p.id), [SituasiUcapan.sapaan]);
-      e.tick(8.9); // sisa 13,6 (> 60%)
+      e.tick(26.6); // sisa 40,1 (> 60%)
       expect(ucapanPelanggan(e, p.id), [SituasiUcapan.sapaan]);
       e.tick(0.2); // < 60%
       expect(ucapanPelanggan(e, p.id).last, SituasiUcapan.sabar1);
@@ -474,7 +474,7 @@ void main() {
       e.ambil(toko1, 'nasi_goreng');
       e.tick(0.1);
       e.tutupLayani(toko1);
-      e.tick(30);
+      e.tick(70);
       expect(ucapanPelanggan(e, p.id), [
         SituasiUcapan.sapaan,
         SituasiUcapan.sabar1,
@@ -490,10 +490,10 @@ void main() {
       datang(e, pesananItem({'es_teh': 1}));
       final p = e.antrean(toko1, Sisi.kiri).single;
       e.bukaLayani(toko1, Sisi.kiri);
-      for (var i = 0; i < 11; i++) {
+      for (var i = 0; i < 32; i++) {
         e.ambil(toko1, 'nasi_goreng'); // -1,5 dtk tiap salah ambil
       }
-      e.tick(0.1); // sisa 22,5 - 16,5 - 0,1 < 30%
+      e.tick(0.1); // sisa 66,7 - 48 - 0,1 < 30% (20)
       e.tick(2);
       final sabar = ucapanPelanggan(e, p.id)
           .where((s) => s == SituasiUcapan.sabar1 || s == SituasiUcapan.sabar2)
