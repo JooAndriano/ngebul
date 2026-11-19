@@ -8,6 +8,7 @@ import '../../models/toko.dart';
 import '../../sim/rumus_sim.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ikon_barang.dart';
 import '../notif/notif_service.dart';
 import 'ui_helper.dart';
 
@@ -218,7 +219,7 @@ class _KartuItem extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Text(i.emoji, style: const TextStyle(fontSize: 26)),
+                IkonBarang(i),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -328,7 +329,7 @@ class _KartuItemTerkunci extends ConsumerWidget {
                 opacity: 0.45,
                 child: Row(
                   children: [
-                    Text(i.emoji, style: const TextStyle(fontSize: 26)),
+                    IkonBarang(i),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(

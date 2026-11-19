@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -9,6 +10,8 @@ import '../../models/sim_config.dart';
 import '../../models/sim_types.dart';
 import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
+import '../aset/asset_registry.dart';
+import '../aset/skala_pixel.dart';
 import 'fase_pelanggan.dart';
 import 'hiasan_pelanggan.dart';
 import 'pelanggan_walker.dart';
@@ -44,9 +47,14 @@ abstract interface class SumberScene {
 /// Ucapan pelanggan tampil di atas walker-nya. Pelanggan yang tidak sempat
 /// antre (mahal, antrean penuh) tampil sebagai pelintas.
 class WarungGame extends FlameGame {
-  WarungGame({required this.sumber});
+  WarungGame({required this.sumber, AssetRegistry? aset})
+    : aset = aset ?? AssetRegistry();
 
   final SumberScene sumber;
+
+  /// Semua gambar scene diambil lewat sini. Dipreload di [onLoad],
+  /// dibersihkan di [onRemove].
+  final AssetRegistry aset;
 
   /// Walker yang sedang di antrean.
   final Map<int, PelangganWalker> _walkers = {};
@@ -93,8 +101,17 @@ class WarungGame extends FlameGame {
 
   @override
   Future<void> onLoad() async {
+    // Tidak ditunggu: scene langsung jalan dengan placeholder, sprite
+    // muncul sendiri begitu preload selesai.
+    unawaited(aset.muat());
     await add(_LatarWarung(this)..priority = -10);
     await add(_segel);
+  }
+
+  @override
+  void onRemove() {
+    aset.bersihkan();
+    super.onRemove();
   }
 
   @override
@@ -146,6 +163,7 @@ class WarungGame extends FlameGame {
       yKaki: _tata.yKaki,
       kecepatan: _tata.kecepatan,
       onKetuk: sumber.ketukPelanggan,
+      aset: aset,
     );
     add(w);
     return w;
@@ -435,6 +453,45 @@ class _LatarWarung extends Component {
     super.onRemove();
   }
 
+  /// Gambar [sp] dengan skala piksel fisik bulat di [area]: [tutup] =
+  /// menutupi area (boleh terpotong, rata bawah), selain itu muat di dalam
+  /// area (rata bawah-tengah).
+  void _gambarPenuh(
+    Canvas canvas,
+    Sprite sp,
+    Rect area, {
+    required bool tutup,
+  }) {
+    final dpr = AssetRegistry.rasioPiksel;
+    final iw = sp.srcSize.x.round();
+    final ih = sp.srcSize.y.round();
+    final double s;
+    if (tutup) {
+      s = math.max(
+        skalaPixelTutup(target: area.width, sumber: iw, dpr: dpr),
+        skalaPixelTutup(target: area.height, sumber: ih, dpr: dpr),
+      );
+    } else {
+      s = math.min(
+        skalaPixel(target: area.width, sumber: iw, dpr: dpr),
+        skalaPixel(target: area.height, sumber: ih, dpr: dpr),
+      );
+    }
+    final dw = iw * s;
+    final dh = ih * s;
+    final x = snapPixel(area.left + (area.width - dw) / 2, dpr);
+    final y = snapPixel(area.bottom - dh, dpr);
+    canvas.save();
+    if (tutup) canvas.clipRect(area);
+    sp.render(
+      canvas,
+      position: Vector2(x, y),
+      size: Vector2(dw, dh),
+      overridePaint: AssetRegistry.paintPixel,
+    );
+    canvas.restore();
+  }
+
   @override
   void render(Canvas canvas) {
     final tata = game.tata;
@@ -454,12 +511,17 @@ class _LatarWarung extends Component {
 
     final yTanah = s(tata.yTanah);
 
-    // Matahari & awan sederhana.
-    blok(w * 0.82, h * 0.08, u * 9, u * 9, const Color(0xFFFFE066));
-    blok(w * 0.12, h * 0.12, u * 14, u * 4, Colors.white);
-    blok(w * 0.12 + u * 3, h * 0.12 - u * 3, u * 8, u * 3, Colors.white);
-    blok(w * 0.62, h * 0.20, u * 12, u * 4, Colors.white);
-    blok(w * 0.62 + u * 2, h * 0.20 - u * 2, u * 6, u * 2, Colors.white);
+    // Langit: background PNG bila ada, kalau tidak matahari & awan.
+    final bg = game.aset.backgroundHari();
+    if (bg != null) {
+      _gambarPenuh(canvas, bg, Rect.fromLTWH(0, 0, w, yTanah), tutup: true);
+    } else {
+      blok(w * 0.82, h * 0.08, u * 9, u * 9, const Color(0xFFFFE066));
+      blok(w * 0.12, h * 0.12, u * 14, u * 4, Colors.white);
+      blok(w * 0.12 + u * 3, h * 0.12 - u * 3, u * 8, u * 3, Colors.white);
+      blok(w * 0.62, h * 0.20, u * 12, u * 4, Colors.white);
+      blok(w * 0.62 + u * 2, h * 0.20 - u * 2, u * 6, u * 2, Colors.white);
+    }
 
     // Trotoar + jalan dengan garis putus-putus.
     blok(0, yTanah, w, h * 0.10, const Color(0xFFBDBDBD));
@@ -473,6 +535,13 @@ class _LatarWarung extends Component {
     final bh = tata.tinggiWarung;
     final left = tata.pusatX - bw / 2;
     final top = yTanah - bh;
+
+    // Warung PNG bila ada (belum ada level warung di engine: lv1).
+    final ws = game.aset.warung(1);
+    if (ws != null) {
+      _gambarPenuh(canvas, ws, Rect.fromLTWH(left, top, bw, bh), tutup: false);
+      return;
+    }
 
     blok(
       left,

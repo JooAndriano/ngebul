@@ -8,6 +8,7 @@ import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ikon_barang.dart';
 import 'warung_game.dart';
 
 /// Pakai scene Flame (Stage 2) di layar utama. False = scene widget lama
@@ -34,7 +35,7 @@ class _WarungGameViewState extends ConsumerState<WarungGameView>
   @override
   void initState() {
     super.initState();
-    _game = WarungGame(sumber: this);
+    _game = WarungGame(sumber: this, aset: ref.read(assetRegistryProvider));
   }
 
   // Dibaca tiap frame oleh game; tidak perlu rebuild widget per tick.

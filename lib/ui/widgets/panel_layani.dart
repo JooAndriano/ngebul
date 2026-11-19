@@ -13,6 +13,7 @@ import '../../models/toko.dart';
 import '../../sim/rumus_sim.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ikon_barang.dart';
 
 /// Panel pick & pack: kiri daftar pesanan, kanan rak. Waktu TIDAK berhenti.
 class PanelLayani extends ConsumerStatefulWidget {
@@ -267,7 +268,7 @@ class _BarisPesananView extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(kiri, 3, 4, 3),
         child: Row(
           children: [
-            Text(i.emoji, style: const TextStyle(fontSize: 18)),
+            IkonBarang(i, ukuran: 18),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -410,14 +411,14 @@ class _SlotRak extends StatelessWidget {
                 Expanded(
                   flex: 3,
                   child: FittedBox(
-                    child: Text(
-                      terkunci
-                          ? TampilanData.emojiKunci
-                          : sisa <= 0
-                          ? TampilanData.emojiStokHabis
-                          : item.emoji,
-                      style: const TextStyle(fontSize: 26),
-                    ),
+                    child: terkunci || sisa <= 0
+                        ? Text(
+                            terkunci
+                                ? TampilanData.emojiKunci
+                                : TampilanData.emojiStokHabis,
+                            style: const TextStyle(fontSize: 26),
+                          )
+                        : IkonBarang(item),
                   ),
                 ),
                 Flexible(

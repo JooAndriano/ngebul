@@ -5,13 +5,18 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/sim_types.dart';
+import '../aset/asset_registry.dart';
+import '../aset/palet_pixel.dart';
+import '../aset/path_aset.dart';
+import '../aset/skala_pixel.dart';
 import 'fase_pelanggan.dart';
 import 'hiasan_pelanggan.dart';
 
 /// Visual pelanggan di jalan. Murni kosmetik: logika (antrean, kesabaran,
 /// pesanan) tetap di engine. Satu walker = satu `Pelanggan.id`.
 ///
-/// Placeholder: emoji. Saat sprite pixel siap, cukup ganti [_gambarFigur].
+/// Gambar diambil dari [AssetRegistry] per [varian] & [stateKarakter].
+/// Belum ada PNG -> placeholder kotak berwarna (warna varian) + emoji tipe.
 class PelangganWalker extends PositionComponent with TapCallbacks {
   PelangganWalker({
     required this.pelangganId,
@@ -22,7 +27,9 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
     required double yKaki,
     required this.kecepatan,
     this.onKetuk,
+    this.aset,
   }) : _tx = x,
+       varian = AssetRegistry.varianUntuk(pelangganId),
        super(
          position: Vector2(x, yKaki),
          size: Vector2.all(ukuran),
@@ -35,6 +42,12 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   final String emoji;
   final Sisi sisi;
 
+  /// Sumber gambar (null = selalu placeholder).
+  final AssetRegistry? aset;
+
+  /// Varian tampilan 1..4, stabil per pelanggan.
+  final int varian;
+
   /// Kecepatan jalan dalam piksel/detik.
   double kecepatan;
 
@@ -46,8 +59,11 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   static const double _durasiMarah = 0.9;
 
   final Paint _paintBayangan = Paint()..color = const Color(0x44000000);
-  TextPainter? _tp;
+  final Paint _paintBadan = Paint()..isAntiAlias = false;
+  TextPainter? _tpKepala;
+  TextPainter? _tpLencana;
   TextPainter? _tpMarah;
+  bool _hadapKiri = false;
   double _tx;
   bool _keluar = false;
   bool _jalan = false;
@@ -98,6 +114,20 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   bool get bisaDiketukSekarang =>
       !_keluar &&
       bisaDiketuk(status: _status, terdepan: _terdepan, sudahTiba: sudahTiba);
+
+  /// Keadaan animasi: walk saat bergerak, wait saat menunggu dilayani,
+  /// selain itu idle.
+  StateKarakter get stateKarakter {
+    if (_jalan) return StateKarakter.walk;
+    if (!_keluar && _status == StatusPelanggan.menunggu) {
+      return StateKarakter.menunggu;
+    }
+    return StateKarakter.idle;
+  }
+
+  /// True kalau sedang digambar dengan sprite (bukan placeholder).
+  bool get pakaiSprite =>
+      aset?.animasiPelanggan(varian).untuk(stateKarakter) != null;
 
   /// Pindah ke slot antrean baru (mis. antrean maju).
   void tujuan(double x) {
@@ -194,6 +224,8 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
     if (selisih.abs() < _toleransi) {
       position.x = _tx;
       _jalan = false;
+      // Diam: menghadap warung.
+      _hadapKiri = sisi == Sisi.kanan;
       if (_keluar) {
         removeFromParent();
         return;
@@ -210,6 +242,7 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
     final langkah = v * dt;
     position.x += selisih.abs() <= langkah ? selisih : selisih.sign * langkah;
     _jalan = true;
+    _hadapKiri = selisih < 0;
   }
 
   /// Susun hiasan dari bawah ke atas: bar -> bubble -> ucapan.
@@ -260,41 +293,87 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   @override
   void render(Canvas canvas) {
     _gambarBayangan(canvas);
+    final anim = aset?.animasiPelanggan(varian).untuk(stateKarakter);
+    if (anim != null) {
+      // Sprite: langkah kaki sudah ada di frame, tanpa efek loncat.
+      _gambarSprite(canvas, anim.frameKe(_t));
+      if (_marah && _sisaMarah > 0) _gambarMarah(canvas, 0);
+      return;
+    }
     // Efek loncat kecil saat berjalan (lebih cepat saat kabur).
     final frek = _marah ? 20.0 : 14.0;
     final bob = _jalan ? math.sin(_t * frek).abs() * size.y * 0.12 : 0.0;
-    _gambarFigur(canvas, bob);
+    _gambarPlaceholder(canvas, bob);
     if (_marah && _sisaMarah > 0) _gambarMarah(canvas, bob);
   }
 
   @override
   void onRemove() {
-    _tp?.dispose();
-    _tp = null;
-    _tpMarah?.dispose();
-    _tpMarah = null;
+    for (final tp in [_tpKepala, _tpLencana, _tpMarah]) {
+      tp?.dispose();
+    }
+    _tpKepala = _tpLencana = _tpMarah = null;
     super.onRemove();
   }
 
-  // Bagian di bawah ini yang diganti saat sprite pixel tersedia.
+  static TextPainter _teks(String s, double ukuran) => TextPainter(
+    text: TextSpan(
+      text: s,
+      style: TextStyle(fontSize: ukuran),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
 
   void _siapkanFigur() {
-    _tp?.dispose();
-    _tp = TextPainter(
-      text: TextSpan(
-        text: emoji,
-        style: TextStyle(fontSize: size.x * 0.85),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    _tpMarah?.dispose();
-    _tpMarah = TextPainter(
-      text: TextSpan(
-        text: '💢',
-        style: TextStyle(fontSize: size.x * 0.4),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
+    for (final tp in [_tpKepala, _tpLencana, _tpMarah]) {
+      tp?.dispose();
+    }
+    _tpKepala = _teks(emoji, size.x * 0.5);
+    _tpLencana = _teks(emoji, size.x * 0.3);
+    _tpMarah = _teks('💢', size.x * 0.4);
+  }
+
+  /// Sprite 32x32 dengan skala piksel fisik bulat, menempel ke grid piksel
+  /// layar, kaki di dasar komponen. Sprite menghadap kanan; dibalik saat
+  /// menghadap kiri. Lencana emoji tipe tetap tampil (tipe = info gameplay).
+  void _gambarSprite(Canvas canvas, Sprite frame) {
+    final dpr = AssetRegistry.rasioPiksel;
+    final s = skalaPixel(target: size.y, sumber: UkuranAset.karakter, dpr: dpr);
+    final sisi = UkuranAset.karakter * s;
+    final abs = absoluteTopLeftPosition;
+    final x0 = snapPixel(abs.x + (size.x - sisi) / 2, dpr) - abs.x;
+    final y0 = snapPixel(abs.y + size.y - sisi, dpr) - abs.y;
+    canvas.save();
+    if (_hadapKiri) {
+      canvas.translate(x0 + sisi, y0);
+      canvas.scale(-1, 1);
+    } else {
+      canvas.translate(x0, y0);
+    }
+    frame.render(
+      canvas,
+      size: Vector2.all(sisi),
+      overridePaint: AssetRegistry.paintPixel,
+    );
+    canvas.restore();
+    final tp = _tpLencana;
+    if (tp != null) {
+      tp.paint(canvas, Offset(size.x - tp.width * 0.8, y0 - tp.height * 0.2));
+    }
+  }
+
+  /// Placeholder: badan kotak warna varian + kepala emoji tipe.
+  void _gambarPlaceholder(Canvas canvas, double bob) {
+    final w = size.x;
+    final h = size.y;
+    _paintBadan.color = PaletPixel.untukVarian(varian);
+    canvas.drawRect(
+      Rect.fromLTWH(w * 0.27, h * 0.48 - bob, w * 0.46, h * 0.52),
+      _paintBadan,
+    );
+    final tp = _tpKepala;
+    if (tp == null) return;
+    tp.paint(canvas, Offset((w - tp.width) / 2, h * 0.5 - tp.height - bob));
   }
 
   void _gambarBayangan(Canvas canvas) {
@@ -306,12 +385,6 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
       ),
       _paintBayangan,
     );
-  }
-
-  void _gambarFigur(Canvas canvas, double bob) {
-    final tp = _tp;
-    if (tp == null) return;
-    tp.paint(canvas, Offset((size.x - tp.width) / 2, size.y - tp.height - bob));
   }
 
   void _gambarMarah(Canvas canvas, double bob) {
