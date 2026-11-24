@@ -51,6 +51,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flame_test: ^2.3.1
   image: ^4.13.1
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -105,3 +107,25 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Ikon aplikasi: `dart run flutter_launcher_icons`
+# Sumber di store_assets/ (hasil tool/process_assets.dart, di luar bundle).
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "store_assets/ic_launcher.png"
+  adaptive_icon_foreground: "store_assets/ic_launcher_foreground.png"
+  adaptive_icon_background: "store_assets/ic_launcher_background.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+
+# Native splash: `dart run flutter_native_splash:create`
+# Logo di atas warna kuning-oranye ikon; Android 12+ memakai ikon warung.
+flutter_native_splash:
+  color: "#F9BC55"
+  image: store_assets/splash_logo.png
+  android_12:
+    color: "#F9BC55"
+    image: store_assets/splash_android12.png
+    icon_background_color: "#F9BC55"
+  fullscreen: true
