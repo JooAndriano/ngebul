@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
@@ -10,6 +11,7 @@ import 'package:ngebul/ui/aset/palet_pixel.dart';
 import 'package:ngebul/ui/aset/path_aset.dart';
 import 'package:ngebul/ui/aset/skala_pixel.dart';
 import 'package:ngebul/ui/flame/pelanggan_walker.dart';
+import 'package:ngebul/ui/flame/pemalak_komponen.dart';
 
 /// Bundle yang selalu gagal (file rusak / tidak ada).
 class _BundleRusak extends CachingAssetBundle {
@@ -117,7 +119,8 @@ void main() {
     });
   });
 
-  test('varian pelanggan stabil per id dan mencakup >= 4 varian', () {
+  test('tipe pelanggan stabil per id dan mencakup 6 tipe', () {
+    expect(AssetRegistry.jumlahVarianPelanggan, 6);
     final terlihat = <int>{};
     for (var id = 1; id <= 200; id++) {
       final v = AssetRegistry.varianUntuk(id);
@@ -180,29 +183,151 @@ void main() {
     _render(w);
   });
 
-  testWidgets('aset uji di assets/images termuat dari bundle sungguhan', (
-    tester,
-  ) async {
+  group('manifest', () {
+    test('tiap aset di KatalogAset ada di folder yang di-bundle', () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final semua = KatalogAset.semua;
+      expect(semua, isNotEmpty);
+      for (final e in semua.entries) {
+        final path = '$prefixGambar${e.value}';
+        expect(File(path).existsSync(), isTrue, reason: '${e.key}: $path');
+        final folder = path.substring(0, path.lastIndexOf('/') + 1);
+        expect(pubspec, contains('- $folder'), reason: 'folder $folder');
+      }
+    });
+
+    test('kunci konsisten: item_<id>, customer_<n>_<state>', () {
+      final k = KatalogAset.semua.keys;
+      expect(k, containsAll(['item_beras', 'customer_01_walk', 'bg_malam']));
+      expect(k, containsAll(['troll_ormas_marah', 'pakrt_gaksanggup']));
+      expect(k, contains('kasir_kerja'));
+      // Ikon aplikasi & grafis toko TIDAK masuk bundle game.
+      expect(k.where((x) => x.startsWith('ic_launcher')), isEmpty);
+      expect(
+        Directory('${prefixGambar}ui')
+            .listSync()
+            .map((f) => f.path)
+            .where((p) => p.contains('ic_launcher') || p.contains('play_')),
+        isEmpty,
+      );
+    });
+
+    testWidgets('semua aset termuat dari bundle sungguhan', (tester) async {
+      final r = AssetRegistry();
+      await tester.runAsync(r.muat);
+      expect(r.siap, isTrue);
+      expect(r.asetTermuat, containsAll(KatalogAset.semua.values));
+
+      // Barang: id katalog lewat alias nama file.
+      expect(r.spriteUntukBarang('minyak').adaGambar, isTrue);
+      expect(r.spriteUntukBarang('kopi').adaGambar, isTrue);
+      expect(r.spriteUntukBarang('teh_celup').adaGambar, isTrue);
+      expect(r.spriteUntukBarang('bakso', emoji: '🍜').adaGambar, isFalse);
+
+      // Pelanggan: walk 4 frame seukuran, idle 1 frame.
+      final a = r.animasiPelanggan(1);
+      expect(a.walk!.frames, hasLength(UkuranAset.frameJalan));
+      expect(
+        a.walk!.ukuranFrame,
+        Vector2(
+          UkuranAset.lebarPelanggan.toDouble(),
+          UkuranAset.tinggiPelanggan.toDouble(),
+        ),
+      );
+      expect(a.idle!.frames, hasLength(1));
+      expect(a.idle!.ukuranFrame, a.walk!.ukuranFrame);
+      // _wait belum ada -> menunggu memakai idle.
+      expect(a.untuk(StateKarakter.menunggu), same(a.idle));
+
+      // customer_05 belum ada -> cadangan tipe 6 (berikutnya yang ada).
+      final c5 = r.animasiPelanggan(5);
+      expect(c5.adaGambar, isTrue);
+      expect(c5.varian, 5);
+      expect(c5.varianGambar, 6);
+
+      expect(r.pakRT(StatePakRT.walk)!.frames, hasLength(4));
+      expect(
+        r.pakRT(StatePakRT.gakSanggup)!.ukuranFrame,
+        Vector2(
+          UkuranAset.lebarPakRT.toDouble(),
+          UkuranAset.tinggiPakRT.toDouble(),
+        ),
+      );
+      expect(r.kasir(kerja: true)!.frames, hasLength(2));
+      expect(r.kasir(kerja: false)!.ukuranFrame.y, UkuranAset.tinggiKasir);
+
+      for (final f in FaseLatar.values) {
+        expect(r.latar(f), isNotNull, reason: '$f');
+      }
+      for (var l = 1; l <= 4; l++) {
+        expect(r.warung(l), isNotNull);
+      }
+      expect(r.ekstensiWarung(kiri: true, tingkat: 2), isNotNull);
+      expect(r.segelWarung(), isNotNull);
+      for (final j in JenisPemalak.values) {
+        final besar = r.troll(j.name)!;
+        final marah = r.troll(j.name, marah: true)!;
+        // Pasangan berukuran sama: ganti varian tidak melompat.
+        expect(besar.srcSize, marah.srcSize);
+      }
+      expect(r.gambarUi('coin'), isNotNull);
+      expect(r.logo(), isNotNull);
+      // Yang hilang hanya yang sengaja diminta di atas.
+      expect(r.asetHilang, {
+        PathAset.barang('bakso'),
+        PathAset.pelanggan(5, StateKarakter.idle),
+        PathAset.pelanggan(5, StateKarakter.walk),
+      });
+      r.bersihkan();
+    });
+  });
+
+  group('fallback per kategori', () {
+    test(
+      'manifest kosong: semua null/placeholder, render tidak crash',
+      () async {
+        final r = AssetRegistry(daftarAset: () async => const []);
+        await r.muat();
+        expect(r.pakRT(StatePakRT.idle), isNull);
+        expect(r.kasir(kerja: true), isNull);
+        expect(r.latar(FaseLatar.malam), isNull);
+        expect(r.ekstensiWarung(kiri: false, tingkat: 1), isNull);
+        expect(r.segelWarung(), isNull);
+        expect(r.troll('jeruk', marah: true), isNull);
+        expect(r.gambarUi('star'), isNull);
+        expect(r.logo(), isNull);
+        // Tidak ada satu pun gambar pelanggan: tetap placeholder.
+        expect(r.animasiPelanggan(5).adaGambar, isFalse);
+
+        final p = PemalakKomponen(
+          jenis: JenisPemalak.pajek,
+          emoji: '🧾',
+          ukuran: 100,
+          xDiam: 50,
+          xKeluar: -100,
+          yKaki: 300,
+          aset: r,
+        )..aturMarah(true);
+        expect(p.spriteTroll, isNull);
+        _render(p);
+        final rt = PakRTKomponen(
+          ukuran: 90,
+          x: 300,
+          yKaki: 300,
+          kecepatan: 100,
+          aset: r,
+        );
+        _render(rt);
+        final k = KasirKomponen(aset: r)
+          ..atur(x: 10, yKaki: 10, ukuran: 40, label: 'Kasir', progres: 0.5);
+        _render(k);
+      },
+    );
+  });
+
+  testWidgets('walker memakai sprite dari bundle sungguhan', (tester) async {
     final r = AssetRegistry();
     await tester.runAsync(r.muat);
-    expect(r.siap, isTrue);
-
-    final b = r.spriteUntukBarang('nasi_goreng', emoji: '🍛');
-    expect(b.adaGambar, isTrue);
-    expect(b.sprite!.srcSize, Vector2.all(UkuranAset.barang.toDouble()));
-
-    final a = r.animasiPelanggan(1);
-    expect(a.walk!.frames, hasLength(UkuranAset.frameJalan));
-    expect(a.walk!.frames.first.srcSize, Vector2.all(32));
-    expect(a.idle, isNotNull);
-    // _wait belum ada -> menunggu memakai idle.
-    expect(a.untuk(StateKarakter.menunggu), same(a.idle));
-
-    expect(r.backgroundHari(), isNotNull);
-
-    // Varian tanpa gambar tetap placeholder.
-    expect(r.animasiPelanggan(4).adaGambar, isFalse);
-
     final id = [
       for (var i = 1; i < 100; i++) i,
     ].firstWhere((i) => AssetRegistry.varianUntuk(i) == 1);

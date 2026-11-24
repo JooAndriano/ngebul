@@ -22,7 +22,7 @@ import 'package:flutter/services.dart';
 import 'palet_pixel.dart';
 import 'path_aset.dart';
 
-export 'path_aset.dart' show StateKarakter;
+export 'path_aset.dart' show FaseLatar, StateKarakter, StatePakRT;
 
 /// Hasil [AssetRegistry.spriteUntukBarang]: sprite, atau emoji placeholder.
 class AsetBarang {
@@ -39,12 +39,16 @@ class AsetBarang {
   bool get adaGambar => sprite != null;
 }
 
-/// Frame-frame satu animasi karakter (frame 32x32 berjajar horizontal).
+/// Frame-frame satu animasi karakter (frame seukuran berjajar horizontal,
+/// kaki di baris terbawah; jangkar bawah-tengah).
 class AnimasiKarakter {
   AnimasiKarakter(this.frames, {this.fps = 8});
 
   final List<Sprite> frames;
   final double fps;
+
+  /// Ukuran satu frame (piksel sumber).
+  Vector2 get ukuranFrame => frames.first.srcSize;
 
   Sprite frameKe(double waktu) {
     if (frames.length == 1) return frames.first;
@@ -61,9 +65,13 @@ class AnimasiPelanggan {
     this.idle,
     this.walk,
     this.menunggu,
-  });
+    int? varianGambar,
+  }) : varianGambar = varianGambar ?? varian;
 
   final int varian;
+
+  /// Tipe yang gambarnya dipakai (beda dari [varian] bila memakai cadangan).
+  final int varianGambar;
   final ui.Color warnaPlaceholder;
   final AnimasiKarakter? idle;
   final AnimasiKarakter? walk;
@@ -93,8 +101,9 @@ class AssetRegistry extends ChangeNotifier {
   final AssetBundle? _bundle;
   final DaftarAset? _daftarAset;
 
-  /// Jumlah varian pelanggan (customer_01..customer_04).
-  static const int jumlahVarianPelanggan = 4;
+  /// Jumlah tipe tampilan pelanggan (customer_01..customer_06). Tipe yang
+  /// belum punya gambar memakai tipe cadangan (lihat [animasiPelanggan]).
+  static const int jumlahVarianPelanggan = 6;
 
   /// Paint untuk semua sprite pixel: tanpa filter & tanpa anti-alias.
   static final ui.Paint paintPixel = ui.Paint()
@@ -194,7 +203,7 @@ class AssetRegistry extends ChangeNotifier {
 
   // --------------------------------------------------------- per kategori
 
-  /// Ikon barang 16x16 (`items/item_<id>.png`). Placeholder: [emoji].
+  /// Ikon barang (`items/item_<id>.png`, id katalog). Placeholder: [emoji].
   AsetBarang spriteUntukBarang(String id, {String emoji = '📦'}) {
     final img = _ambil(PathAset.barang(id));
     if (img == null) return AsetBarang._(emoji: emoji);
@@ -202,43 +211,107 @@ class AssetRegistry extends ChangeNotifier {
     return AsetBarang._(sprite: s, gambar: img, emoji: emoji);
   }
 
-  /// Animasi pelanggan varian [varian] (1..[jumlahVarianPelanggan]).
+  /// Animasi pelanggan tipe [varian] (1..[jumlahVarianPelanggan]). Tipe
+  /// tanpa gambar (mis. customer_05 belum dibuat) memakai tipe berikutnya
+  /// yang ada (deterministik), supaya tidak ada kotak placeholder di
+  /// tengah sprite. Placeholder hanya bila tidak ada satu pun gambar.
   AnimasiPelanggan animasiPelanggan(int varian) {
     final k = 'anim:pelanggan:$varian';
     if (_memo.containsKey(k)) return _memo[k]! as AnimasiPelanggan;
-    final a = AnimasiPelanggan(
-      varian: varian,
-      warnaPlaceholder: PaletPixel.untukVarian(varian),
-      idle: _animasi(PathAset.pelanggan(varian, StateKarakter.idle), fps: 3),
-      walk: _animasi(PathAset.pelanggan(varian, StateKarakter.walk), fps: 8),
-      menunggu: _animasi(
-        PathAset.pelanggan(varian, StateKarakter.menunggu),
-        fps: 3,
-        wajib: false,
-      ),
-    );
+    var a = _animasiPelangganPersis(varian, catat: true);
+    for (var i = 1; i < jumlahVarianPelanggan && !a.adaGambar; i++) {
+      final v = (varian - 1 + i) % jumlahVarianPelanggan + 1;
+      final c = _animasiPelangganPersis(v, catat: false);
+      if (c.adaGambar) {
+        a = AnimasiPelanggan(
+          varian: varian,
+          warnaPlaceholder: a.warnaPlaceholder,
+          idle: c.idle,
+          walk: c.walk,
+          menunggu: c.menunggu,
+          varianGambar: v,
+        );
+      }
+    }
     if (_siap) _memo[k] = a;
     return a;
   }
 
-  /// Varian pelanggan: tampak acak tapi selalu sama untuk id yang sama.
+  AnimasiPelanggan _animasiPelangganPersis(int v, {required bool catat}) =>
+      AnimasiPelanggan(
+        varian: v,
+        varianGambar: v,
+        warnaPlaceholder: PaletPixel.untukVarian(v),
+        idle: _animasi(
+          PathAset.pelanggan(v, StateKarakter.idle),
+          fps: 3,
+          wajib: catat,
+        ),
+        walk: _animasi(
+          PathAset.pelanggan(v, StateKarakter.walk),
+          frame: UkuranAset.frameJalan,
+          fps: 1 / UkuranAset.langkahJalan,
+          wajib: catat,
+        ),
+        menunggu: _animasi(
+          PathAset.pelanggan(v, StateKarakter.menunggu),
+          fps: 3,
+          wajib: false,
+        ),
+      );
+
+  /// Tipe pelanggan: tampak acak tapi selalu sama untuk id yang sama
+  /// (1..[jumlahVarianPelanggan]).
   static int varianUntuk(int pelangganId) {
     // Hash Knuth multiplikatif, dibatasi 31 bit agar sama di web & native.
     final h = (pelangganId * 2654435761) & 0x7fffffff;
     return (h >> 8) % jumlahVarianPelanggan + 1;
   }
 
-  /// Background siang (backgrounds/bg_hari.png). Null = latar prosedural.
-  Sprite? backgroundHari() => _sprite(PathAset.background('hari'));
+  /// Animasi Pak RT. Null = emoji. Walk menghadap KIRI.
+  AnimasiKarakter? pakRT(StatePakRT s) => _memoAnim(
+    PathAset.pakRT(s),
+    frame: s == StatePakRT.walk ? UkuranAset.frameJalan : 1,
+    fps: 1 / UkuranAset.langkahJalan,
+  );
 
-  /// Bangunan warung level [level]. Null = warung prosedural.
+  /// Animasi kasir: [kerja] = 2 frame sibuk, selain itu idle. Null = emoji.
+  AnimasiKarakter? kasir({required bool kerja}) => _memoAnim(
+    PathAset.kasir(kerja: kerja),
+    frame: kerja ? UkuranAset.frameKasirKerja : 1,
+    fps: 1 / UkuranAset.langkahKasir,
+  );
+
+  /// Latar fase [fase]. Null = latar prosedural.
+  Sprite? latar(FaseLatar fase) => _sprite(PathAset.background(fase.nama));
+
+  /// Latar siang (bg_hari). Null = latar prosedural.
+  Sprite? backgroundHari() => latar(FaseLatar.hari);
+
+  /// Bangunan warung level [level] (1..4). Null = warung prosedural.
   Sprite? warung(int level) => _sprite(PathAset.warung(level));
 
-  /// Karakter troll/pemalak [id]. Null = emoji.
-  Sprite? troll(String id) => _sprite(PathAset.troll(id));
+  /// Ekstensi warung sisi [kiri]/kanan, [tingkat] 1 atau 2. Null = kosong.
+  Sprite? ekstensiWarung({required bool kiri, required int tingkat}) =>
+      _sprite(PathAset.ekstensi(kiri: kiri, tingkat: tingkat));
 
-  /// Ikon UI [nama]. Null = emoji/ikon Material.
+  /// Papan silang segel. Null = segel prosedural.
+  Sprite? segelWarung() => _sprite(PathAset.segel);
+
+  /// Troll/pemalak [id] (nama JenisPemalak atau nama file). [marah] =
+  /// varian marah. Null = emoji.
+  Sprite? troll(String id, {bool marah = false}) =>
+      _sprite(PathAset.troll(id, marah: marah));
+
+  /// Ikon/panel UI [nama] (`ui/ui_<nama>.png`). Null = emoji/Material.
   Sprite? ikonUi(String nama) => _sprite(PathAset.ui(nama));
+
+  /// Gambar mentah UI [nama] untuk widget Flutter (RawImage). Null =
+  /// fallback widget.
+  ui.Image? gambarUi(String nama) => _ambil(PathAset.ui(nama));
+
+  /// Logo judul. Null = teks.
+  ui.Image? logo() => _ambil(PathAset.logo);
 
   // ------------------------------------------------------------ internal
 
@@ -256,19 +329,36 @@ class AssetRegistry extends ChangeNotifier {
   Sprite _memoSprite(String path, ui.Image img) =>
       (_memo['sprite:$path'] ??= Sprite(img)) as Sprite;
 
-  /// Spritesheet horizontal; jumlah frame = lebar / tinggi (frame persegi).
+  AnimasiKarakter? _memoAnim(
+    String path, {
+    required int frame,
+    required double fps,
+  }) {
+    final k = 'anim:$path';
+    if (_memo.containsKey(k)) return _memo[k] as AnimasiKarakter?;
+    final a = _animasi(path, frame: frame, fps: fps);
+    if (_siap) _memo[k] = a;
+    return a;
+  }
+
+  /// Spritesheet horizontal berisi [frame] frame seukuran (lebar / frame).
   AnimasiKarakter? _animasi(
     String path, {
     required double fps,
+    int frame = 1,
     bool wajib = true,
   }) {
     final img = _ambil(path, wajib: wajib);
     if (img == null) return null;
-    final t = img.height.toDouble();
-    final n = (img.width / img.height).floor().clamp(1, 64);
+    final n = frame.clamp(1, img.width);
+    if (img.width % n != 0) {
+      _log('$path: lebar ${img.width} tidak habis dibagi $n frame');
+    }
+    final w = (img.width ~/ n).toDouble();
+    final h = img.height.toDouble();
     return AnimasiKarakter([
       for (var i = 0; i < n; i++)
-        Sprite(img, srcPosition: Vector2(i * t, 0), srcSize: Vector2.all(t)),
+        Sprite(img, srcPosition: Vector2(i * w, 0), srcSize: Vector2(w, h)),
     ], fps: fps);
   }
 

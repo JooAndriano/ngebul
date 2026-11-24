@@ -29,6 +29,19 @@ double skalaPixelTutup({
   return fisik / d;
 }
 
+/// Skala logis dengan skala fisik bulat TERDEKAT (>= 1): hasil boleh
+/// sedikit lebih besar dari [target]. Dipakai bangunan warung, yang
+/// ukurannya lebih penting daripada muat persis.
+double skalaPixelDekat({
+  required double target,
+  required int sumber,
+  required double dpr,
+}) {
+  final d = dpr > 0 ? dpr : 1.0;
+  final fisik = math.max(1, (target * d / sumber).round());
+  return fisik / d;
+}
+
 /// Bulatkan posisi logis ke grid piksel fisik.
 double snapPixel(double v, double dpr) {
   final d = dpr > 0 ? dpr : 1.0;
