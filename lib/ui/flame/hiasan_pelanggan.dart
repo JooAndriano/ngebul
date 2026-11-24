@@ -2,12 +2,57 @@
 // bubble pesanan, bar kesabaran, dan ucapan komik. Tidak menyimpan state
 // simulasi; isinya diatur PelangganWalker tiap frame.
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/sim_data.dart';
+import '../aset/asset_registry.dart';
+import '../aset/path_aset.dart';
+import '../aset/skala_pixel.dart';
 import 'fase_pelanggan.dart';
+
+/// Gelembung dari gambar ui_bubble_kosong (9-slice, tanpa filter). [badan]
+/// = kotak badan lokal (tanpa ekor); ekor menggantung di kiri bawah.
+/// [s] = piksel logis per piksel sumber.
+void gambarBubbleSprite(
+  Canvas canvas,
+  ui.Image img,
+  Rect badan, {
+  required double s,
+  Paint? paint,
+}) {
+  const c = SliceUi.bubbleKosong;
+  final w = badan.width / s;
+  final h = badan.height / s + SliceUi.ekorBubbleKosong;
+  canvas.save();
+  canvas.translate(badan.left, badan.top);
+  canvas.scale(s);
+  canvas.drawImageNine(
+    img,
+    Rect.fromLTRB(
+      c.l.toDouble(),
+      c.t.toDouble(),
+      c.r.toDouble(),
+      c.b.toDouble(),
+    ),
+    Rect.fromLTWH(0, 0, math.max(w, img.width - (c.r - c.l) + 1.0), h),
+    paint ?? AssetRegistry.paintPixel,
+  );
+  canvas.restore();
+}
+
+/// Tinggi ekor bubble sprite (piksel logis) untuk skala [s].
+double ekorBubbleSprite(double s) => SliceUi.ekorBubbleKosong * s;
+
+/// Skala bubble kosong agar garis tepinya setebal kira-kira [tebal]
+/// (tepi gambar = 3 px sumber), skala fisik bulat.
+double skalaBubble(double tebal) => skalaPixel(
+  target: tebal / 3 * 63,
+  sumber: 63,
+  dpr: AssetRegistry.rasioPiksel,
+);
 
 /// Gelembung komik: badan bulat putih, garis hitam tebal, ekor ke bawah.
 /// [badan] dalam koordinat lokal; ekor menggantung [ekor] piksel di bawahnya.
@@ -77,9 +122,12 @@ double _pop(double t) {
 /// ujung ekor menempel di [position]. Pop saat muncul; berdenyut saat
 /// bisa diketuk.
 class BubblePesanan extends PositionComponent {
-  BubblePesanan() : super(anchor: Anchor.bottomCenter);
+  BubblePesanan({this.aset}) : super(anchor: Anchor.bottomCenter);
 
   static const double _durasiPop = 0.22;
+
+  /// Sumber gambar bubble (null = gelembung digambar manual).
+  final AssetRegistry? aset;
 
   JenisBubble? _jenis;
   bool _berdenyut = false;
@@ -87,8 +135,18 @@ class BubblePesanan extends PositionComponent {
   double _umur = 0;
   TextPainter? _tp;
 
+  /// Mode sprite: gambar utuh (order/bayar) atau bubble kosong 9-slice
+  /// (kasir/stok habis) + isi.
+  ui.Image? _gambar;
+  ui.Image? _kosong;
+  ui.Image? _ikon;
+  double _s = 1;
+
   JenisBubble? get jenis => _jenis;
   bool get tampil => _jenis != null;
+
+  /// True kalau digambar dari gambar UI (bukan gelembung manual).
+  bool get pakaiSprite => _gambar != null || _kosong != null;
 
   void atur(
     JenisBubble? jenis, {
@@ -96,16 +154,20 @@ class BubblePesanan extends PositionComponent {
     required double ukuran,
   }) {
     _berdenyut = berdenyut;
-    if (jenis == _jenis && ukuran == _ukuran) return;
+    final siap = aset?.siap ?? false;
+    if (jenis == _jenis && ukuran == _ukuran && siap == _asetSiap) return;
+    _asetSiap = siap;
     if (jenis != _jenis) _umur = 0;
     _jenis = jenis;
     _ukuran = ukuran;
     _tp?.dispose();
     _tp = null;
+    _gambar = _kosong = _ikon = null;
     if (jenis == null) {
       size.setZero();
       return;
     }
+    if (_aturSprite(jenis, ukuran)) return;
     final teks = switch (jenis) {
       JenisBubble.tanya => TampilanData.emojiBalonTanya,
       JenisBubble.dilayani => TampilanData.emojiDilayani,
@@ -120,6 +182,89 @@ class BubblePesanan extends PositionComponent {
 
   double get _ekor => _ukuran * 0.14;
 
+  bool _asetSiap = false;
+
+  /// Siapkan mode sprite. False = gambar belum ada (pakai manual).
+  bool _aturSprite(JenisBubble jenis, double ukuran) {
+    final a = aset;
+    if (a == null) return false;
+    final dpr = AssetRegistry.rasioPiksel;
+    switch (jenis) {
+      case JenisBubble.tanya || JenisBubble.dilayani:
+        final img = a.gambarUi(
+          jenis == JenisBubble.tanya ? 'bubble_order' : 'bubble_bayar',
+        );
+        if (img == null) return false;
+        _gambar = img;
+        _s = skalaPixel(target: ukuran * 0.8, sumber: img.height, dpr: dpr);
+        size.setValues(img.width * _s, img.height * _s);
+        return true;
+      case JenisBubble.kasir || JenisBubble.stokHabis:
+        final img = a.gambarUi('bubble_kosong');
+        if (img == null) return false;
+        _kosong = img;
+        _s = skalaBubble(math.max(1.5, ukuran * 0.045));
+        final pad = ukuran * 0.14;
+        final double isiW, isiH;
+        if (jenis == JenisBubble.kasir) {
+          _tp = _teksKomik(
+            '${TampilanData.emojiKasir} dilayani kasir',
+            ukuran * 0.26,
+          );
+          isiW = _tp!.width;
+          isiH = _tp!.height;
+        } else {
+          _ikon = a.gambarUi('icon_stok_habis');
+          if (_ikon == null) {
+            _tp = _teksKomik(TampilanData.emojiStokHabis, ukuran * 0.34);
+            isiW = _tp!.width;
+            isiH = _tp!.height;
+          } else {
+            isiW = isiH = ukuran * 0.4;
+          }
+        }
+        size.setValues(isiW + pad * 2, isiH + pad * 1.4 + ekorBubbleSprite(_s));
+        return true;
+    }
+  }
+
+  void _renderSprite(Canvas canvas) {
+    final g = _gambar;
+    if (g != null) {
+      canvas.drawImageRect(
+        g,
+        Rect.fromLTWH(0, 0, g.width.toDouble(), g.height.toDouble()),
+        Offset.zero & Size(size.x, size.y),
+        AssetRegistry.paintPixel,
+      );
+      return;
+    }
+    final k = _kosong!;
+    final badan = Rect.fromLTWH(0, 0, size.x, size.y - ekorBubbleSprite(_s));
+    gambarBubbleSprite(canvas, k, badan, s: _s);
+    final ikon = _ikon;
+    if (ikon != null) {
+      final sisi = badan.height * 0.72;
+      final rasio = ikon.width / ikon.height;
+      canvas.drawImageRect(
+        ikon,
+        Rect.fromLTWH(0, 0, ikon.width.toDouble(), ikon.height.toDouble()),
+        Rect.fromCenter(
+          center: badan.center,
+          width: sisi * rasio,
+          height: sisi,
+        ),
+        AssetRegistry.paintPixel,
+      );
+      return;
+    }
+    final tp = _tp;
+    tp?.paint(
+      canvas,
+      Offset((size.x - tp.width) / 2, (badan.height - tp.height) / 2),
+    );
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
@@ -131,6 +276,11 @@ class BubblePesanan extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
+    if (_jenis == null) return;
+    if (pakaiSprite) {
+      _renderSprite(canvas);
+      return;
+    }
     final tp = _tp;
     if (tp == null) return;
     final ekor = _ekor;
@@ -194,13 +344,21 @@ class BarKesabaran extends PositionComponent {
 /// Ucapan komik (teks dari engine) dengan pop masuk dan fade-out.
 /// Anchor bottomCenter.
 class UcapanKomik extends PositionComponent {
-  UcapanKomik() : super(anchor: Anchor.bottomCenter);
+  UcapanKomik({this.aset}) : super(anchor: Anchor.bottomCenter);
+
+  /// Sumber gambar bubble (null = gelembung digambar manual).
+  final AssetRegistry? aset;
 
   String? _teks;
   double _alpha = 0;
   double _umur = 0;
   double _font = 12;
   TextPainter? _tp;
+  ui.Image? _kosong;
+  bool _asetSiap = false;
+
+  double get _tebal => math.max(1.5, _font * 0.16);
+  double get _s => skalaBubble(_tebal);
 
   bool get tampil => _teks != null && _alpha > 0;
   String? get teks => _teks;
@@ -213,7 +371,9 @@ class UcapanKomik extends PositionComponent {
     required double maksLebar,
   }) {
     _alpha = alpha;
-    if (teks == _teks && ukuranFont == _font) return;
+    final siap = aset?.siap ?? false;
+    if (teks == _teks && ukuranFont == _font && siap == _asetSiap) return;
+    _asetSiap = siap;
     if (teks != _teks) _umur = 0;
     _teks = teks;
     _font = ukuranFont;
@@ -223,12 +383,16 @@ class UcapanKomik extends PositionComponent {
       size.setZero();
       return;
     }
+    _kosong = aset?.gambarUi('bubble_kosong');
     final pad = ukuranFont * 0.5;
     _tp = _teksKomik(teks, ukuranFont, maksLebar: maksLebar - pad * 2);
     size.setValues(_tp!.width + pad * 2, _tp!.height + pad * 0.9 + _ekor);
   }
 
-  double get _ekor => _font * 0.6;
+  double get _ekor => _kosong != null ? ekorBubbleSprite(_s) : _font * 0.6;
+
+  /// True kalau digambar dari ui_bubble_kosong.
+  bool get pakaiSprite => _kosong != null;
 
   @override
   void update(double dt) {
@@ -250,12 +414,12 @@ class UcapanKomik extends PositionComponent {
     }
     final ekor = _ekor;
     final badan = Rect.fromLTWH(0, 0, size.x, size.y - ekor);
-    gambarGelembungKomik(
-      canvas,
-      badan,
-      ekor: ekor,
-      tebal: math.max(1.5, _font * 0.16),
-    );
+    final k = _kosong;
+    if (k != null) {
+      gambarBubbleSprite(canvas, k, badan, s: _s);
+    } else {
+      gambarGelembungKomik(canvas, badan, ekor: ekor, tebal: _tebal);
+    }
     tp.paint(
       canvas,
       Offset((size.x - tp.width) / 2, (badan.height - tp.height) / 2),

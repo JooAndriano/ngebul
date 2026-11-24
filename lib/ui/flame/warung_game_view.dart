@@ -65,6 +65,13 @@ class _WarungGameViewState extends ConsumerState<WarungGameView>
   @override
   OrmasConfig? konfigOrmas() => _v.engineAtauNull?.config.ormas;
 
+  @override
+  double progresHari() {
+    final e = _v.engineAtauNull;
+    if (e == null || e.config.detikPerHari <= 0) return 0;
+    return (e.waktuHari / e.config.detikPerHari).clamp(0.0, 1.0);
+  }
+
   /// Sama dengan tap pelanggan terdepan di scene lama.
   @override
   void ketukPelanggan(Sisi sisi) {

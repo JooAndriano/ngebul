@@ -39,6 +39,26 @@ abstract final class UkuranAset {
   static const int acuanLebarWarung = 300;
 }
 
+/// Batas 9-slice (centerSlice, piksel sumber: kiri, atas, kanan, bawah)
+/// untuk gambar UI yang diregangkan. Diukur dari hasil pra-proses.
+abstract final class SliceUi {
+  /// ui_bubble_kosong 118x63: ekor di kiri bawah (kolom 12-24), jadi
+  /// tetap di potongan kiri.
+  static const bubbleKosong = (l: 30, t: 10, r: 100, b: 44);
+
+  /// Baris di bawah badan bubble_kosong (ekor).
+  static const int ekorBubbleKosong = 10;
+
+  /// ui_tombol_* 164x102 (bayangan bawah 20 px).
+  static const tombol = (l: 20, t: 20, r: 144, b: 78);
+
+  /// ui_panel_kayu 174x174 (bingkai kayu + garis dalam ~31 px).
+  static const panelKayu = (l: 40, t: 40, r: 134, b: 134);
+
+  /// ui_snackbar 280x48 (lipatan kertas di kanan ~32 px).
+  static const snackbar = (l: 16, t: 8, r: 244, b: 40);
+}
+
 /// Keadaan animasi pelanggan.
 enum StateKarakter {
   idle('idle'),

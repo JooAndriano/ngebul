@@ -1,8 +1,8 @@
 // Figur pemalak, Pak RT, kasir, dan segel di scene Flame. Murni kosmetik:
 // semua keadaan dibaca dari engine oleh WarungGame tiap frame.
 //
-// Placeholder: emoji. Saat sprite pixel siap, cukup ganti method
-// `_gambarFigur` masing-masing komponen.
+// Gambar dari AssetRegistry (troll_*, pakrt_*, kasir_*, warung_segel);
+// placeholder emoji/prosedural bila gambar belum ada.
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -10,8 +10,12 @@ import 'package:flutter/material.dart';
 
 import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
+import '../aset/asset_registry.dart';
+import '../aset/skala_pixel.dart';
+import 'gambar_sprite.dart';
 import 'hiasan_pelanggan.dart';
 import 'tampilan_pemalak.dart';
+import 'tampilan_scene.dart';
 
 TextPainter _emoji(String e, double ukuran) => TextPainter(
   text: TextSpan(
@@ -39,6 +43,7 @@ class PemalakKomponen extends PositionComponent {
     required double xKeluar,
     required double yKaki,
     bool langsungDiam = false,
+    this.aset,
   }) : _xDiam = xDiam,
        _xKeluar = xKeluar,
        _fase = langsungDiam ? _FasePemalak.diam : _FasePemalak.masuk,
@@ -54,6 +59,9 @@ class PemalakKomponen extends PositionComponent {
   final JenisPemalak jenis;
   final String emoji;
 
+  /// Sumber gambar troll (null = selalu emoji).
+  final AssetRegistry? aset;
+
   static const double durasiMasuk = 0.6;
 
   double _xDiam;
@@ -62,11 +70,19 @@ class PemalakKomponen extends PositionComponent {
   double _t = 0;
   double _umurFase = 0;
   int _tingkat = 0;
+  bool _marah = false;
   TextPainter? _tp;
   TextPainter? _tpMarah;
-  final UcapanKomik _ucapan = UcapanKomik();
+  late final UcapanKomik _ucapan = UcapanKomik(aset: aset);
   final Paint _bayangan = Paint()..color = const Color(0x55000000);
   final Paint _aura = Paint();
+
+  /// Pakai gambar varian `_marah` (lihat [pakaiTrollMarah]).
+  void aturMarah(bool marah) => _marah = marah;
+  bool get varianMarah => _marah;
+
+  /// Sprite troll saat ini (null = emoji).
+  Sprite? get spriteTroll => aset?.troll(jenis.name, marah: _marah);
 
   bool get sedangKeluar => _fase == _FasePemalak.keluar;
   bool get sudahDiam => _fase == _FasePemalak.diam;
@@ -148,6 +164,18 @@ class PemalakKomponen extends PositionComponent {
     final amp = lari ? 0.08 : 0.025 + _tingkat * 0.015;
     final bob = math.sin(_t * frek).abs() * u * amp;
     final getar = _tingkat >= 2 && !lari ? math.sin(_t * 47) * u * 0.012 : 0.0;
+    final sp = spriteTroll;
+    if (sp != null) {
+      gambarSpriteJangkar(
+        canvas,
+        this,
+        sp,
+        s: skalaTinggi(sp, u),
+        cx: u / 2 + getar,
+        dasar: u - bob,
+      );
+      return;
+    }
     _aura.color = warnaAksenPemalak(jenis).withValues(alpha: 0.28);
     canvas.drawCircle(Offset(u / 2, u * 0.55 - bob), u * 0.42, _aura);
     _gambarFigur(canvas, Offset(getar, -bob));
@@ -192,6 +220,7 @@ class PakRTKomponen extends PositionComponent {
     required double x,
     required double yKaki,
     required this.kecepatan,
+    this.aset,
   }) : super(
          position: Vector2(x, yKaki),
          size: Vector2.all(ukuran),
@@ -202,12 +231,31 @@ class PakRTKomponen extends PositionComponent {
   }
 
   double kecepatan;
+
+  /// Sumber gambar Pak RT (null = selalu emoji).
+  final AssetRegistry? aset;
   double? _xKeluar;
   bool _jalan = true;
+  bool _sudahBerseru = false;
+  bool _berhasil = true;
+
+  /// Hasil fase Pak RT dari engine (untuk pose "gak sanggup").
+  void aturHasil({required bool sudahBerseru, required bool berhasil}) {
+    if (sedangKeluar) return;
+    _sudahBerseru = sudahBerseru;
+    _berhasil = berhasil;
+  }
+
+  /// Pose saat ini.
+  StatePakRT get pose => posePakRT(
+    jalan: _jalan,
+    sudahBerseru: _sudahBerseru,
+    berhasil: _berhasil,
+  );
   double _t = 0;
   double _xLalu = double.nan;
   TextPainter? _tp;
-  final UcapanKomik _ucapan = UcapanKomik();
+  late final UcapanKomik _ucapan = UcapanKomik(aset: aset);
   final Paint _bayangan = Paint()..color = const Color(0x55000000);
 
   bool get sedangKeluar => _xKeluar != null;
@@ -268,6 +316,22 @@ class PakRTKomponen extends PositionComponent {
       ),
       _bayangan,
     );
+    final anim = aset?.pakRT(pose);
+    if (anim != null) {
+      // Walk menghadap KIRI (masuk dari kanan); dibalik saat keluar.
+      // Pose diam menghadap depan: tidak dibalik.
+      final sp = anim.frameKe(_t);
+      gambarSpriteJangkar(
+        canvas,
+        this,
+        sp,
+        s: skalaTinggi(sp, u),
+        cx: u / 2,
+        dasar: u,
+        balik: hadapKanan && pose == StatePakRT.walk,
+      );
+      return;
+    }
     final bob = _jalan ? math.sin(_t * 12).abs() * u * 0.06 : 0.0;
     canvas.save();
     if (hadapKanan) {
@@ -302,7 +366,13 @@ class PakRTKomponen extends PositionComponent {
 
 /// Kasir di balik meja warung. Progres proses kasir tampil di atasnya.
 class KasirKomponen extends PositionComponent {
-  KasirKomponen() : super(anchor: Anchor.bottomCenter, priority: -4);
+  KasirKomponen({this.aset}) : super(anchor: Anchor.bottomCenter, priority: -4);
+
+  /// Sumber gambar kasir (null = selalu emoji).
+  final AssetRegistry? aset;
+
+  /// Fraksi tinggi sprite (dari bawah) yang tersembunyi di balik meja.
+  static const double potongBawah = 0.42;
 
   TextPainter? _tp;
   TextPainter? _tpLabel;
@@ -310,7 +380,7 @@ class KasirKomponen extends PositionComponent {
   double _ukuran = 0;
   double? _progres;
   double _t = 0;
-  final UcapanKomik _ucapan = UcapanKomik();
+  late final UcapanKomik _ucapan = UcapanKomik(aset: aset);
   final Paint _latarBar = Paint()..color = const Color(0xCC212121);
   final Paint _isiBar = Paint()..color = const Color(0xFF29B6F6);
 
@@ -371,12 +441,33 @@ class KasirKomponen extends PositionComponent {
   void render(Canvas canvas) {
     final u = _ukuran;
     if (u <= 0) return;
-    // Sibuk: bergoyang sedikit.
-    final bob = _progres == null ? 0.0 : math.sin(_t * 14).abs() * u * 0.05;
-    final tp = _tp;
-    tp?.paint(canvas, Offset((u - tp.width) / 2, u - tp.height - bob));
-    final lb = _tpLabel;
-    lb?.paint(canvas, Offset((u - lb.width) / 2, u - lb.height * 0.9));
+    final anim = aset?.kasir(kerja: _progres != null);
+    if (anim != null) {
+      // Kaki di bawah garis meja tidak digambar (seolah di balik meja).
+      final sp = anim.frameKe(_t);
+      final meja = u * (1 - potongBawah);
+      canvas.save();
+      canvas.clipRect(Rect.fromLTRB(-u, -u * 2, u * 2, meja));
+      gambarSpriteJangkar(
+        canvas,
+        this,
+        sp,
+        s: skalaTinggi(sp, u),
+        cx: u / 2,
+        dasar: u,
+      );
+      canvas.restore();
+      final lb = _tpLabel;
+      // Label di depan meja (tidak menutupi badan kasir).
+      lb?.paint(canvas, Offset((u - lb.width) / 2, meja + 1));
+    } else {
+      // Sibuk: bergoyang sedikit.
+      final bob = _progres == null ? 0.0 : math.sin(_t * 14).abs() * u * 0.05;
+      final tp = _tp;
+      tp?.paint(canvas, Offset((u - tp.width) / 2, u - tp.height - bob));
+      final lb = _tpLabel;
+      lb?.paint(canvas, Offset((u - lb.width) / 2, u - lb.height * 0.9));
+    }
     final p = _progres;
     if (p != null) {
       final w = u * 0.9;
@@ -427,20 +518,27 @@ class SegelKomponen extends Component {
   TextPainter? _tp;
   double _tpTinggi = -1;
   final Paint _p = Paint();
+  Sprite? _silang;
 
   bool get aktif => _aktif;
   double get tutup => _tutup;
 
+  /// True kalau digambar dengan sprite warung_segel.
+  bool get pakaiSprite => _silang != null;
+
+  /// [silang] = sprite papan silang (null = rolling door prosedural).
   void atur({
     required bool aktif,
     required Rect bukaan,
     required Rect warung,
     required String papan,
     bool langsung = false,
+    Sprite? silang,
   }) {
     _aktif = aktif;
     _bukaan = bukaan;
     _warung = warung;
+    _silang = silang;
     if (papan != _papan) {
       _papan = papan;
       _tpTinggi = -1;
@@ -455,9 +553,45 @@ class SegelKomponen extends Component {
     _tutup = (_tutup + arah * dt / durasiTurun).clamp(0.0, 1.0);
   }
 
+  /// Sprite: bayangan gelap turun menutupi warung, lalu papan silang
+  /// dipaku di depannya + papan "DISEGEL".
+  void _renderSprite(Canvas canvas, Sprite sp) {
+    final w = _warung;
+    if (w.isEmpty) return;
+    final turun = w.height * _easeOut(_tutup);
+    canvas.drawRect(
+      Rect.fromLTWH(w.left, w.top, w.width, turun),
+      _p..color = const Color(0x66000000),
+    );
+    if (_tutup < 1) return;
+    final dpr = AssetRegistry.rasioPiksel;
+    final s = skalaPixelDekat(
+      target: w.width,
+      sumber: sp.srcSize.x.round(),
+      dpr: dpr,
+    );
+    final sw = sp.srcSize.x * s, sh = sp.srcSize.y * s;
+    sp.render(
+      canvas,
+      position: Vector2(
+        snapPixel(w.center.dx - sw / 2, dpr),
+        snapPixel(w.bottom - w.height * 0.45 - sh / 2, dpr),
+      ),
+      size: Vector2(sw, sh),
+      overridePaint: AssetRegistry.paintPixel,
+    );
+    _gambarPapan(canvas, w, w.top + w.height * 0.25);
+  }
+
   @override
   void render(Canvas canvas) {
-    if (_tutup <= 0 || _bukaan.isEmpty) return;
+    if (_tutup <= 0) return;
+    final sp = _silang;
+    if (sp != null) {
+      _renderSprite(canvas, sp);
+      return;
+    }
+    if (_bukaan.isEmpty) return;
     final b = _bukaan;
     // Rolling door (bergaris horizontal).
     final tinggiPintu = b.height * _easeOut(_tutup);
@@ -496,8 +630,11 @@ class SegelKomponen extends Component {
       }
       canvas.restore();
     }
+    _gambarPapan(canvas, w, b.top);
+  }
 
-    // Papan "DISEGEL" merah, sedikit miring.
+  /// Papan "DISEGEL" merah, sedikit miring, berpusat di x warung & [y].
+  void _gambarPapan(Canvas canvas, Rect w, double y) {
     final ukFont = math.max(12.0, w.height * 0.14);
     if (_tp == null || _tpTinggi != ukFont) {
       _tpTinggi = ukFont;
@@ -517,7 +654,7 @@ class SegelKomponen extends Component {
     }
     final tp = _tp!;
     canvas.save();
-    canvas.translate(w.center.dx, b.top - ukFont * 0.2);
+    canvas.translate(w.center.dx, y - ukFont * 0.2);
     canvas.rotate(-0.08);
     final papan = Rect.fromCenter(
       center: Offset.zero,

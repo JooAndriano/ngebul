@@ -265,7 +265,8 @@ class AssetRegistry extends ChangeNotifier {
   static int varianUntuk(int pelangganId) {
     // Hash Knuth multiplikatif, dibatasi 31 bit agar sama di web & native.
     final h = (pelangganId * 2654435761) & 0x7fffffff;
-    return (h >> 8) % jumlahVarianPelanggan + 1;
+    // Bit atas: id berurutan (kedatangan beruntun) jarang bertipe sama.
+    return (h >> 16) % jumlahVarianPelanggan + 1;
   }
 
   /// Animasi Pak RT. Null = emoji. Walk menghadap KIRI.

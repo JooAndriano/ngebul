@@ -119,6 +119,21 @@ void main() {
     });
   });
 
+  test('id berurutan jarang bertipe sama (tampak bervariasi)', () {
+    var sama = 0;
+    for (var id = 1; id < 600; id++) {
+      if (AssetRegistry.varianUntuk(id) == AssetRegistry.varianUntuk(id + 1)) {
+        sama++;
+      }
+    }
+    // Acak murni ~1/6 (100); tanpa campuran bit atas > 300.
+    expect(sama, lessThan(120));
+    final awal = {
+      for (var id = 1; id <= 6; id++) AssetRegistry.varianUntuk(id),
+    };
+    expect(awal.length, greaterThanOrEqualTo(4));
+  });
+
   test('tipe pelanggan stabil per id dan mencakup 6 tipe', () {
     expect(AssetRegistry.jumlahVarianPelanggan, 6);
     final terlihat = <int>{};

@@ -11,12 +11,32 @@ import '../../models/sim_types.dart';
 import '../../models/tipe_pelanggan_data.dart';
 import '../../models/toko.dart';
 import '../aset/asset_registry.dart';
+import '../aset/path_aset.dart';
 import '../aset/skala_pixel.dart';
 import 'fase_pelanggan.dart';
 import 'hiasan_pelanggan.dart';
 import 'pelanggan_walker.dart';
 import 'pemalak_komponen.dart';
+import 'tampilan_scene.dart';
 import 'tata_letak.dart';
+
+/// Kotak bangunan warung di layar. [sprite] null = warung prosedural
+/// (kotak dari tata letak).
+class GeometriWarung {
+  const GeometriWarung({
+    required this.level,
+    required this.kotak,
+    required this.skala,
+    this.sprite,
+  });
+
+  final int level;
+  final Rect kotak;
+
+  /// Piksel logis per piksel sumber (0 bila prosedural).
+  final double skala;
+  final Sprite? sprite;
+}
 
 /// Penghubung scene Flame ke state engine. Scene hanya MEMBACA lewat ini,
 /// dan aksi pemain diteruskan ke SimController (sama dengan scene lama).
@@ -34,6 +54,9 @@ abstract interface class SumberScene {
 
   /// Konfigurasi pemalak & Pak RT (null = belum ada engine).
   OrmasConfig? konfigOrmas();
+
+  /// Fraksi hari yang sudah berlalu (0..1), untuk fase latar.
+  double progresHari();
 
   /// Pelanggan terdepan [sisi] diketuk: buka panel Layani.
   void ketukPelanggan(Sisi sisi);
@@ -98,6 +121,48 @@ class WarungGame extends FlameGame {
 
   @override
   Color backgroundColor() => const Color(0xFF8FD3F4);
+
+  /// Level & kotak warung toko fokus. Level diturunkan dari ekspansi
+  /// (lihat [levelWarung]); skala sama untuk semua level & ekstensi.
+  GeometriWarung geometriWarung() {
+    final t = _toko ?? sumber.tokoFokus();
+    final level = t == null
+        ? 1
+        : levelWarung(t.ekspansi[Sisi.kiri] ?? 0, t.ekspansi[Sisi.kanan] ?? 0);
+    final sp = aset.warung(level);
+    final tata = _tata;
+    if (sp == null) {
+      return GeometriWarung(
+        level: level,
+        skala: 0,
+        kotak: Rect.fromLTWH(
+          tata.pusatX - tata.lebarWarung / 2,
+          tata.yAtasWarung,
+          tata.lebarWarung,
+          tata.tinggiWarung,
+        ),
+      );
+    }
+    final dpr = AssetRegistry.rasioPiksel;
+    final s = skalaPixelDekat(
+      target: tata.lebarWarung,
+      sumber: UkuranAset.acuanLebarWarung,
+      dpr: dpr,
+    );
+    final w = sp.srcSize.x * s, h = sp.srcSize.y * s;
+    final bawah = snapPixel(tata.yTanah, dpr);
+    return GeometriWarung(
+      level: level,
+      skala: s,
+      sprite: sp,
+      kotak: Rect.fromLTWH(
+        snapPixel(tata.pusatX - w / 2, dpr),
+        bawah - h,
+        w,
+        h,
+      ),
+    );
+  }
 
   @override
   Future<void> onLoad() async {
@@ -300,8 +365,9 @@ class WarungGame extends FlameGame {
     }
     _ucapanDitangani.removeWhere((id) => !ucapan.any((u) => u.id == id));
 
+    final geo = geometriWarung();
     _sinkronPemalak(t, snap);
-    _sinkronKasir(t);
+    _sinkronKasir(t, geo);
     _segel.atur(
       aktif: t.kondisiSegel,
       bukaan: Rect.fromLTWH(
@@ -310,14 +376,10 @@ class WarungGame extends FlameGame {
         _tata.bukaan.lebar,
         _tata.bukaan.tinggi,
       ),
-      warung: Rect.fromLTWH(
-        _tata.pusatX - _tata.lebarWarung / 2,
-        _tata.yAtasWarung,
-        _tata.lebarWarung,
-        _tata.tinggiWarung,
-      ),
+      warung: geo.kotak,
       papan: TeksPemalakData.papanSegel,
       langsung: ganti,
+      silang: aset.segelWarung(),
     );
   }
 
@@ -346,6 +408,7 @@ class WarungGame extends FlameGame {
           xKeluar: _tata.xKeluarPemalak,
           yKaki: _tata.yKakiPemalak,
           langsungDiam: snap,
+          aset: aset,
         );
         add(_pemalak!);
       }
@@ -355,6 +418,7 @@ class WarungGame extends FlameGame {
       }
       _pemalak!
         ..aturTingkat(tingkat)
+        ..aturMarah(pakaiTrollMarah(o.kemarahan, c.kemarahanMaks))
         // Saat hadir, kalimatnya tampil di bubble memalak (overlay).
         ..aturUcapan(null);
     } else if (_pemalak != null && !_pemalak!.sedangKeluar) {
@@ -377,9 +441,11 @@ class WarungGame extends FlameGame {
           x: _tata.xTepiKananPakRT,
           yKaki: _tata.yKakiPemalak,
           kecepatan: _tata.kecepatan,
+          aset: aset,
         );
         add(_pakRT!);
       }
+      _pakRT!.aturHasil(sudahBerseru: f.sudahBerseru, berhasil: f.berhasil);
       final k = (f.berjalan / c.pakRT.durasiDatang).clamp(0.0, 1.0);
       final x0 = _tata.xTepiKananPakRT;
       _pakRT!.keX(x0 + (_tata.xBerhentiPakRT - x0) * k);
@@ -390,7 +456,7 @@ class WarungGame extends FlameGame {
     _pakRT?.aturUcapan(u?.teks, alpha: u == null ? 0 : _alphaUcapan(u));
   }
 
-  void _sinkronKasir(Toko t) {
+  void _sinkronKasir(Toko t, GeometriWarung geo) {
     if (!t.punyaKasir) {
       _kasir?.removeFromParent();
       _kasir = null;
@@ -398,13 +464,26 @@ class WarungGame extends FlameGame {
     }
     var k = _kasir;
     if (k == null) {
-      k = _kasir = KasirKomponen();
+      k = _kasir = KasirKomponen(aset: aset);
       add(k);
     }
+    // Sprite kasir: kerapatan piksel sama dengan pelanggan, berdiri di
+    // balik meja warung (kaki tersembunyi). Tanpa sprite: posisi lama.
+    final pakaiSprite = geo.sprite != null && aset.kasir(kerja: false) != null;
+    final meja = mejaWarung[geo.level]!;
+    final ukuran = pakaiSprite
+        ? _tata.ukuranPelanggan *
+              UkuranAset.tinggiKasir /
+              UkuranAset.tinggiPelanggan
+        : _tata.ukuranKasir;
     k.atur(
-      x: _tata.xKasir,
-      yKaki: _tata.yMeja,
-      ukuran: _tata.ukuranKasir,
+      x: pakaiSprite ? geo.kotak.left + geo.kotak.width * meja.x : _tata.xKasir,
+      yKaki: pakaiSprite
+          ? geo.kotak.top +
+                geo.kotak.height * meja.y +
+                ukuran * KasirKomponen.potongBawah
+          : _tata.yMeja,
+      ukuran: ukuran,
       label: t.kasirLevel > 0 ? 'Lv${t.kasirLevel}' : 'Kasir',
       progres: t.prosesKasir?.progres,
     );
@@ -416,7 +495,7 @@ class WarungGame extends FlameGame {
   double _alphaUcapan(UcapanEvent u) => (u.sisaDetik / 0.4).clamp(0.0, 1.0);
 
   _UcapanMelayang _buatMelayang(Sisi sisi) {
-    final m = _UcapanMelayang()
+    final m = _UcapanMelayang(aset)
       ..position.setValues(
         _tata.slotX(sisi, 0),
         _tata.yKaki - _tata.ukuranPelanggan * 1.2,
@@ -430,14 +509,16 @@ class WarungGame extends FlameGame {
 /// Ucapan pelanggan yang walker-nya sudah tidak ada (mis. baru ganti toko):
 /// tampil di dekat antrean sisinya.
 class _UcapanMelayang extends PositionComponent {
-  final UcapanKomik ucapan = UcapanKomik();
+  _UcapanMelayang(AssetRegistry aset) : ucapan = UcapanKomik(aset: aset);
+
+  final UcapanKomik ucapan;
 
   @override
   Future<void> onLoad() async => add(ucapan);
 }
 
 /// Latar + bangunan warung, digambar dengan blok persegi (gaya pixel).
-/// Ruang kiri & kanan warung sengaja kosong untuk upgrade nanti.
+/// Sprite (latar per fase, warung per level, ekstensi) bila ada.
 class _LatarWarung extends Component {
   _LatarWarung(this.game);
 
@@ -461,6 +542,7 @@ class _LatarWarung extends Component {
     Sprite sp,
     Rect area, {
     required bool tutup,
+    Paint? paint,
   }) {
     final dpr = AssetRegistry.rasioPiksel;
     final iw = sp.srcSize.x.round();
@@ -487,9 +569,55 @@ class _LatarWarung extends Component {
       canvas,
       position: Vector2(x, y),
       size: Vector2(dw, dh),
-      overridePaint: AssetRegistry.paintPixel,
+      overridePaint: paint ?? AssetRegistry.paintPixel,
     );
     canvas.restore();
+  }
+
+  /// Paint pixel dengan opasitas (crossfade latar).
+  final Paint _paintPudar = Paint()
+    ..filterQuality = FilterQuality.none
+    ..isAntiAlias = false;
+
+  /// Latar sesuai fase hari, crossfade di batas fase. False = belum ada
+  /// gambar latar (pakai langit & jalan prosedural).
+  bool _gambarLatar(Canvas canvas, Rect area) {
+    final c = campuranLatar(game.sumber.progresHari());
+    final a = game.aset.latar(c.dari) ?? game.aset.backgroundHari();
+    if (a == null) return false;
+    _gambarPenuh(canvas, a, area, tutup: true);
+    final b = c.t > 0 ? game.aset.latar(c.ke) : null;
+    if (b != null) {
+      _paintPudar.color = Color.fromRGBO(0, 0, 0, c.t);
+      _gambarPenuh(canvas, b, area, tutup: true, paint: _paintPudar);
+    }
+    return true;
+  }
+
+  /// Ekstensi kiri/kanan sesuai level ekspansi, menempel di sisi bangunan,
+  /// rata bawah, skala sama dengan bangunan.
+  void _gambarEkstensi(Canvas canvas, GeometriWarung geo) {
+    final t = game._toko;
+    if (t == null || geo.sprite == null) return;
+    final dpr = AssetRegistry.rasioPiksel;
+    final s = geo.skala;
+    for (final kiri in [true, false]) {
+      final tingkat = tingkatEkstensi(
+        t.ekspansi[kiri ? Sisi.kiri : Sisi.kanan] ?? 0,
+      );
+      if (tingkat == null) continue;
+      final sp = game.aset.ekstensiWarung(kiri: kiri, tingkat: tingkat);
+      if (sp == null) continue;
+      final w = sp.srcSize.x * s, h = sp.srcSize.y * s;
+      final tumpang = tumpangEkstensi * s;
+      final x = kiri ? geo.kotak.left - w + tumpang : geo.kotak.right - tumpang;
+      sp.render(
+        canvas,
+        position: Vector2(snapPixel(x, dpr), geo.kotak.bottom - h),
+        size: Vector2(w, h),
+        overridePaint: AssetRegistry.paintPixel,
+      );
+    }
   }
 
   @override
@@ -511,37 +639,42 @@ class _LatarWarung extends Component {
 
     final yTanah = s(tata.yTanah);
 
-    // Langit: background PNG bila ada, kalau tidak matahari & awan.
-    final bg = game.aset.backgroundHari();
-    if (bg != null) {
-      _gambarPenuh(canvas, bg, Rect.fromLTWH(0, 0, w, yTanah), tutup: true);
-    } else {
+    // Latar PNG (sudah termasuk tanah & jalan) menutupi seluruh scene,
+    // rata bawah. Kalau belum ada: langit, trotoar & jalan prosedural.
+    if (!_gambarLatar(canvas, Rect.fromLTWH(0, 0, w, h))) {
       blok(w * 0.82, h * 0.08, u * 9, u * 9, const Color(0xFFFFE066));
       blok(w * 0.12, h * 0.12, u * 14, u * 4, Colors.white);
       blok(w * 0.12 + u * 3, h * 0.12 - u * 3, u * 8, u * 3, Colors.white);
       blok(w * 0.62, h * 0.20, u * 12, u * 4, Colors.white);
       blok(w * 0.62 + u * 2, h * 0.20 - u * 2, u * 6, u * 2, Colors.white);
+
+      // Trotoar + jalan dengan garis putus-putus.
+      blok(0, yTanah, w, h * 0.10, const Color(0xFFBDBDBD));
+      blok(0, yTanah + h * 0.10, w, h, const Color(0xFF4E4E4E));
+      for (var x = 0.0; x < w; x += u * 14) {
+        blok(x, yTanah + h * 0.16, u * 7, u, const Color(0xFFEEEEEE));
+      }
     }
 
-    // Trotoar + jalan dengan garis putus-putus.
-    blok(0, yTanah, w, h * 0.10, const Color(0xFFBDBDBD));
-    blok(0, yTanah + h * 0.10, w, h, const Color(0xFF4E4E4E));
-    for (var x = 0.0; x < w; x += u * 14) {
-      blok(x, yTanah + h * 0.16, u * 7, u, const Color(0xFFEEEEEE));
+    // Warung PNG sesuai level (dasar sprite = garis tanah), plus ekstensi.
+    final geo = game.geometriWarung();
+    final ws = geo.sprite;
+    if (ws != null) {
+      _gambarEkstensi(canvas, geo);
+      ws.render(
+        canvas,
+        position: Vector2(geo.kotak.left, geo.kotak.top),
+        size: Vector2(geo.kotak.width, geo.kotak.height),
+        overridePaint: AssetRegistry.paintPixel,
+      );
+      return;
     }
 
-    // Warung tampak depan.
+    // Warung prosedural tampak depan.
     final bw = tata.lebarWarung;
     final bh = tata.tinggiWarung;
     final left = tata.pusatX - bw / 2;
     final top = yTanah - bh;
-
-    // Warung PNG bila ada (belum ada level warung di engine: lv1).
-    final ws = game.aset.warung(1);
-    if (ws != null) {
-      _gambarPenuh(canvas, ws, Rect.fromLTWH(left, top, bw, bh), tutup: false);
-      return;
-    }
 
     blok(
       left,

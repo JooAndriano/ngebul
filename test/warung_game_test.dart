@@ -38,6 +38,9 @@ class _Sumber implements SumberScene {
   OrmasConfig? konfigOrmas() => e.config.ormas;
 
   @override
+  double progresHari() => e.waktuHari / e.config.detikPerHari;
+
+  @override
   void ketukPelanggan(Sisi sisi) {
     diketuk.add(sisi);
     e.bukaLayani(toko1, sisi);

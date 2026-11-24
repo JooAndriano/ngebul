@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import '../../models/sim_types.dart';
 import '../aset/asset_registry.dart';
 import '../aset/palet_pixel.dart';
-import '../aset/path_aset.dart';
 import '../aset/skala_pixel.dart';
 import 'fase_pelanggan.dart';
 import 'hiasan_pelanggan.dart';
@@ -81,9 +80,9 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   bool _terdepan = false;
   double _fraksi = 1;
 
-  final BubblePesanan _bubble = BubblePesanan();
+  late final BubblePesanan _bubble = BubblePesanan(aset: aset);
   final BarKesabaran _bar = BarKesabaran();
-  final UcapanKomik _ucapan = UcapanKomik();
+  late final UcapanKomik _ucapan = UcapanKomik(aset: aset);
 
   bool get sedangKeluar => _keluar;
 
@@ -333,26 +332,29 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
     _tpMarah = _teks('💢', size.x * 0.4);
   }
 
-  /// Sprite 32x32 dengan skala piksel fisik bulat, menempel ke grid piksel
-  /// layar, kaki di dasar komponen. Sprite menghadap kanan; dibalik saat
-  /// menghadap kiri. Lencana emoji tipe tetap tampil (tipe = info gameplay).
+  /// Sprite dengan skala piksel fisik bulat (tinggi frame -> [size.y] =
+  /// ukuranPelanggan), menempel ke grid piksel layar, jangkar bawah-tengah
+  /// (kaki di dasar komponen). Sprite menghadap kanan; dibalik saat
+  /// berjalan/menghadap ke kiri. Lencana emoji tipe tetap tampil (tipe =
+  /// info gameplay).
   void _gambarSprite(Canvas canvas, Sprite frame) {
     final dpr = AssetRegistry.rasioPiksel;
-    final s = skalaPixel(target: size.y, sumber: UkuranAset.karakter, dpr: dpr);
-    final sisi = UkuranAset.karakter * s;
+    final fw = frame.srcSize.x, fh = frame.srcSize.y;
+    final s = skalaPixel(target: size.y, sumber: fh.round(), dpr: dpr);
+    final lebar = fw * s, tinggi = fh * s;
     final abs = absoluteTopLeftPosition;
-    final x0 = snapPixel(abs.x + (size.x - sisi) / 2, dpr) - abs.x;
-    final y0 = snapPixel(abs.y + size.y - sisi, dpr) - abs.y;
+    final x0 = snapPixel(abs.x + (size.x - lebar) / 2, dpr) - abs.x;
+    final y0 = snapPixel(abs.y + size.y - tinggi, dpr) - abs.y;
     canvas.save();
     if (_hadapKiri) {
-      canvas.translate(x0 + sisi, y0);
+      canvas.translate(x0 + lebar, y0);
       canvas.scale(-1, 1);
     } else {
       canvas.translate(x0, y0);
     }
     frame.render(
       canvas,
-      size: Vector2.all(sisi),
+      size: Vector2(lebar, tinggi),
       overridePaint: AssetRegistry.paintPixel,
     );
     canvas.restore();
