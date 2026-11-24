@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Aset gambar asli (hasil generate, besar). Hasil pra-proses ada di
+# assets/images/ (lihat tool/process_assets.dart).
+/assets_src/
