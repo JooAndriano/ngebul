@@ -340,7 +340,9 @@ class PelangganWalker extends PositionComponent with TapCallbacks {
   void _gambarSprite(Canvas canvas, Sprite frame) {
     final dpr = AssetRegistry.rasioPiksel;
     final fw = frame.srcSize.x, fh = frame.srcSize.y;
-    final s = skalaPixel(target: size.y, sumber: fh.round(), dpr: dpr);
+    // Bulat TERDEKAT: pembulatan ke bawah bisa memotong ukuran jadi separuh
+    // (mis. 1,97x -> 1x di dpr 2,625).
+    final s = skalaPixelDekat(target: size.y, sumber: fh.round(), dpr: dpr);
     final lebar = fw * s, tinggi = fh * s;
     final abs = absoluteTopLeftPosition;
     final x0 = snapPixel(abs.x + (size.x - lebar) / 2, dpr) - abs.x;

@@ -22,8 +22,30 @@ class TataLetakScene {
   double get lebarWarung => lebar * 0.26;
   double get tinggiWarung => tinggi * 0.42;
 
-  double get ukuranPelanggan => tinggi * 0.15;
-  double get jarakDasar => ukuranPelanggan * 0.95;
+  /// Tinggi figur pelanggan (sprite full-body, kaki sampai kepala).
+  static const double fraksiPelanggan = 0.22;
+
+  /// Jarak antar pelanggan di antrean, relatif ke tingginya (sprite lebih
+  /// ramping dari tingginya: frame 46x72).
+  static const double fraksiJarak = 0.75;
+
+  /// Ruang vertikal minimal untuk bubble memalak (tombol >= 44 dp) di atas
+  /// area pelanggan.
+  static const double ruangBubblePemalak = 150;
+
+  /// Tinggi area pelanggan (badan + bar + bubble pesanan) / ukuranPelanggan.
+  static const double faktorAreaPelanggan = 1.75;
+
+  /// [fraksiPelanggan] x tinggi, dikecilkan di layar pendek supaya bubble
+  /// memalak tetap muat (minimal 15% tinggi).
+  double get ukuranPelanggan => math.max(
+    tinggi * 0.15,
+    math.min(
+      tinggi * fraksiPelanggan,
+      (yKaki - ruangBubblePemalak) / faktorAreaPelanggan,
+    ),
+  );
+  double get jarakDasar => ukuranPelanggan * fraksiJarak;
 
   /// Kecepatan jalan pelanggan (piksel/detik).
   double get kecepatan => lebar * 0.22;
@@ -81,7 +103,7 @@ class TataLetakScene {
 
   /// Batas atas area tap pelanggan (badan + bar + bubble pesanan). Bubble
   /// memalak harus berada di atas garis ini agar tidak menghalangi tap.
-  double get yAtasPelanggan => yKaki - ukuranPelanggan * 1.75;
+  double get yAtasPelanggan => yKaki - ukuranPelanggan * faktorAreaPelanggan;
 
   /// Batas bawah bubble memalak (y).
   double get yBawahBubblePemalak =>

@@ -40,8 +40,8 @@ void gambarSpriteJangkar(
   canvas.restore();
 }
 
-/// Skala logis (fisik bulat) agar tinggi [sp] mendekati [tinggi].
-double skalaTinggi(Sprite sp, double tinggi) => skalaPixel(
+/// Skala logis (fisik bulat TERDEKAT) agar tinggi [sp] mendekati [tinggi].
+double skalaTinggi(Sprite sp, double tinggi) => skalaPixelDekat(
   target: tinggi,
   sumber: sp.srcSize.y.round(),
   dpr: AssetRegistry.rasioPiksel,

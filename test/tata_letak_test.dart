@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngebul/models/sim_types.dart';
 import 'package:ngebul/ui/flame/tata_letak.dart';
@@ -11,8 +13,22 @@ void main() {
         expect(t.yTanah, closeTo(t.tinggi * 0.78, 1e-9));
         expect(t.yKaki, closeTo(t.yTanah + t.tinggi * 0.05, 1e-9));
         expect(t.lebarWarung, closeTo(t.lebar * 0.26, 1e-9));
-        expect(t.ukuranPelanggan, closeTo(t.tinggi * 0.15, 1e-9));
-        expect(t.jarakDasar, closeTo(t.ukuranPelanggan * 0.95, 1e-9));
+        expect(t.ukuranPelanggan, lessThanOrEqualTo(t.tinggi * 0.22 + 1e-9));
+        expect(t.ukuranPelanggan, greaterThanOrEqualTo(t.tinggi * 0.15));
+        // Bubble memalak selalu punya ruang di atas pelanggan.
+        expect(
+          t.yAtasPelanggan,
+          greaterThanOrEqualTo(
+            math.min(TataLetakScene.ruangBubblePemalak, t.yKaki * 0.4) - 1e-9,
+          ),
+        );
+        expect(t.jarakDasar, closeTo(t.ukuranPelanggan * 0.75, 1e-9));
+      });
+
+      test('layar besar: pelanggan 22% tinggi', () {
+        if (t.tinggi >= 360) {
+          expect(t.ukuranPelanggan, closeTo(t.tinggi * 0.22, 1e-9));
+        }
       });
 
       test('slot kiri & kanan simetris terhadap pusat', () {

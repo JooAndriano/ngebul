@@ -89,9 +89,7 @@ void main() {
     ctrl.mulai(JenisUsaha.makanan, nama: 'Warung Uji');
     await tester.pumpAndSettle();
     for (final nama in ['coin', 'star', 'icon_sms', 'icon_toko']) {
-      final ikon = find.byWidgetPredicate(
-        (w) => w is IkonUi && w.nama == nama,
-      );
+      final ikon = find.byWidgetPredicate((w) => w is IkonUi && w.nama == nama);
       expect(ikon, findsWidgets, reason: nama);
       expect(
         find.descendant(of: ikon.first, matching: find.byType(GambarPixel)),
