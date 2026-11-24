@@ -7,6 +7,7 @@ import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ikon_barang.dart';
 import '../theme/ngebul_theme.dart';
 import 'dialog_toko.dart';
 
@@ -89,7 +90,11 @@ class _PemilihTokoState extends ConsumerState<PemilihToko> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(t.katalog.emoji),
+                  IkonUi(
+                    'icon_toko',
+                    ukuran: 20,
+                    fallback: Text(t.katalog.emoji),
+                  ),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
@@ -232,7 +237,13 @@ class BarisPemilihToko extends StatelessWidget {
               if (toko.ormas != null)
                 const Padding(
                   padding: EdgeInsets.only(left: 4),
-                  child: _Berdenyut(child: Text(TampilanData.emojiOrmasAktif)),
+                  child: _Berdenyut(
+                    child: IkonUi(
+                      'icon_ormas_alert',
+                      ukuran: 18,
+                      fallback: Text(TampilanData.emojiOrmasAktif),
+                    ),
+                  ),
                 ),
               if (toko.kondisiSegel)
                 const Padding(

@@ -71,13 +71,16 @@ abstract interface class SumberScene {
 /// antre (mahal, antrean penuh) tampil sebagai pelintas.
 class WarungGame extends FlameGame {
   WarungGame({required this.sumber, AssetRegistry? aset})
-    : aset = aset ?? AssetRegistry();
+    : aset = aset ?? AssetRegistry(),
+      _asetSendiri = aset == null;
 
   final SumberScene sumber;
 
-  /// Semua gambar scene diambil lewat sini. Dipreload di [onLoad],
-  /// dibersihkan di [onRemove].
+  /// Semua gambar scene diambil lewat sini. Dipreload di [onLoad].
+  /// Registry dari luar (provider aplikasi, dipakai juga widget Flutter)
+  /// TIDAK dibersihkan saat scene dilepas; registry buatan sendiri iya.
   final AssetRegistry aset;
+  final bool _asetSendiri;
 
   /// Walker yang sedang di antrean.
   final Map<int, PelangganWalker> _walkers = {};
@@ -175,7 +178,7 @@ class WarungGame extends FlameGame {
 
   @override
   void onRemove() {
-    aset.bersihkan();
+    if (_asetSendiri) aset.bersihkan();
     super.onRemove();
   }
 

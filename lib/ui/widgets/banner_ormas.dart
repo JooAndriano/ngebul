@@ -7,6 +7,7 @@ import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ui_pixel.dart';
 import 'notif_pemalak.dart';
 
 /// Banner pilihan saat pemalak hadir (scene lama, flag pakaiSceneFlame
@@ -104,6 +105,7 @@ class BannerOrmas extends ConsumerWidget {
                     child: const Text('Bayar'),
                   ),
                   FilledButton.tonal(
+                    style: gayaTombolDari(context, WarnaTombol.kuning),
                     onPressed: !pakRT && !o.tawarDipakai && e.uang >= tawar
                         ? () => kabari(ctrl.tawarOrmas())
                         : null,

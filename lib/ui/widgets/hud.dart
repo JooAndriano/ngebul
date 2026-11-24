@@ -6,6 +6,7 @@ import '../../data/sim_data.dart';
 import '../../models/sim_types.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ikon_barang.dart';
 import 'pemilih_toko.dart';
 import 'ui_helper.dart';
 
@@ -42,6 +43,8 @@ class Hud extends ConsumerWidget {
           // Pemilih toko (dropdown): pengganti tab antar toko.
           const Flexible(flex: 5, child: PemilihToko()),
           const SizedBox(width: 8),
+          const IkonUi('coin', ukuran: 20, fallback: SizedBox.shrink()),
+          const SizedBox(width: 4),
           Flexible(
             flex: 3,
             child: FittedBox(
@@ -85,7 +88,14 @@ class Hud extends ConsumerWidget {
               ),
             ),
           ),
-          const Tooltip(message: 'Reputasi', child: Icon(Icons.star, size: 18)),
+          const Tooltip(
+            message: 'Reputasi',
+            child: IkonUi(
+              'star',
+              ukuran: 18,
+              fallback: Icon(Icons.star, size: 18),
+            ),
+          ),
           const SizedBox(width: 4),
           SizedBox(
             width: 56,

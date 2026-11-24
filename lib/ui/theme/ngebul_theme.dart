@@ -61,11 +61,15 @@ abstract final class NgebulTheme {
     PrioritasAlert.rendah => const Color(0xFFE8A917),
   };
 
-  static ThemeData buat() {
+  /// [tombol]: gaya FilledButton dari gambar pixel (null = Material).
+  static ThemeData buat({ButtonStyle? tombol}) {
     final skema = ColorScheme.fromSeed(seedColor: benih);
     return ThemeData(
       colorScheme: skema,
       useMaterial3: true,
+      filledButtonTheme: tombol == null
+          ? null
+          : FilledButtonThemeData(style: tombol),
       dialogTheme: const DialogThemeData(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(radiusKartu)),

@@ -5,6 +5,7 @@ import '../core/number_format.dart';
 import '../data/sim_data.dart';
 import '../models/katalog.dart';
 import '../sim/sim_controller.dart';
+import 'aset/ui_pixel.dart';
 import 'widgets/dialog_toko.dart';
 
 /// Layar awal: pilih jenis usaha toko pertama.
@@ -25,10 +26,13 @@ class PilihUsahaScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Text(
-                'Ngebul: Juragan Warung',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+              LogoNgebul(
+                tinggi: 64,
+                fallback: Text(
+                  'Ngebul: Juragan Warung',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const Text('Mau buka usaha apa?'),

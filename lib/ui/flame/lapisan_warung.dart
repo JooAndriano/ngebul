@@ -15,6 +15,7 @@ import '../../models/sim_types.dart';
 import '../../models/toko.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/ui_pixel.dart';
 import '../widgets/notif_pemalak.dart';
 import 'tampilan_pemalak.dart';
 import 'tata_letak.dart';
@@ -101,10 +102,16 @@ class _TombolTebus extends ConsumerWidget {
               ),
             ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(_minTap, _minTap),
-              backgroundColor: const Color(0xFFC62828),
-            ),
+            style:
+                gayaTombolDari(context, WarnaTombol.merah)?.copyWith(
+                  minimumSize: const WidgetStatePropertyAll(
+                    Size(_minTap, _minTap),
+                  ),
+                ) ??
+                FilledButton.styleFrom(
+                  minimumSize: const Size(_minTap, _minTap),
+                  backgroundColor: const Color(0xFFC62828),
+                ),
             onPressed: engine.uang >= denda
                 ? () => ref.read(simControllerProvider.notifier).tebusSegel()
                 : null,

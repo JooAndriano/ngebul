@@ -5,6 +5,8 @@ import '../../core/number_format.dart';
 import '../../data/sim_data.dart';
 import '../../sim/sim_controller.dart';
 import '../../sim/simulation_engine.dart';
+import '../aset/path_aset.dart';
+import '../aset/ui_pixel.dart';
 
 /// Overlay hari disegel penuh, dengan tombol tebus segel.
 class OverlaySegel extends ConsumerWidget {
@@ -20,9 +22,12 @@ class OverlaySegel extends ConsumerWidget {
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(8),
-          child: Card(
+          child: LatarPixel(
+            nama: 'panel_kayu',
+            slice: SliceUi.panelKayu,
+            fallback: (c) => Card(child: c),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -43,6 +48,7 @@ class OverlaySegel extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
+                    style: gayaTombolDari(context, WarnaTombol.merah),
                     onPressed: e.uang >= denda
                         ? () => ref
                               .read(simControllerProvider.notifier)

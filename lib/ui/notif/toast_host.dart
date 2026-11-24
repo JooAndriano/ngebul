@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../aset/path_aset.dart';
+import '../aset/ui_pixel.dart';
 import '../theme/ngebul_theme.dart';
 import 'notif_model.dart';
 import 'notif_service.dart';
@@ -205,53 +207,61 @@ class _ToastCardState extends State<ToastCard> with TickerProviderStateMixin {
       ),
     );
 
-    final kartu = Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: NgebulTheme.latarToast,
-        borderRadius: BorderRadius.circular(NgebulTheme.radiusKartu),
-        boxShadow: NgebulTheme.bayanganLembut,
-        border: Border.all(color: NgebulTheme.garisKomik),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(NgebulTheme.radiusKartu),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: aksi == null ? null : jalankanAksi,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 6,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: NgebulTheme.gradasiNotif(m.jenis),
+    // Latar ui_snackbar (kertas, 9-slice) bila ada; kalau tidak kartu lama.
+    final kartu = Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: LatarPixel(
+        nama: 'snackbar',
+        slice: SliceUi.snackbar,
+        fallback: (c) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: NgebulTheme.latarToast,
+            borderRadius: BorderRadius.circular(NgebulTheme.radiusKartu),
+            boxShadow: NgebulTheme.bayanganLembut,
+            border: Border.all(color: NgebulTheme.garisKomik),
+          ),
+          child: c,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(NgebulTheme.radiusKartu),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: aksi == null ? null : jalankanAksi,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 6,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: NgebulTheme.gradasiNotif(m.jenis),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                isi,
-                Positioned(
-                  left: 6,
-                  right: 0,
-                  bottom: 0,
-                  height: 3,
-                  child: AnimatedBuilder(
-                    animation: _sisa,
-                    builder: (context, _) => FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: 1 - _sisa.value,
-                      child: ColoredBox(color: warna.withValues(alpha: 0.55)),
+                  isi,
+                  Positioned(
+                    left: 6,
+                    right: 0,
+                    bottom: 0,
+                    height: 3,
+                    child: AnimatedBuilder(
+                      animation: _sisa,
+                      builder: (context, _) => FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: 1 - _sisa.value,
+                        child: ColoredBox(color: warna.withValues(alpha: 0.55)),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
