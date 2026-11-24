@@ -96,11 +96,19 @@ class IkonUi extends ConsumerWidget {
     super.key,
     required this.ukuran,
     required this.fallback,
-  });
+  }) : logo = false;
+
+  /// Logo ikon Ngebul (`ui/logo_ngebul_ikon.png`, lencana bulat).
+  const IkonUi.logo({super.key, required this.ukuran, required this.fallback})
+    : nama = 'logo_ngebul_ikon',
+      logo = true;
 
   final String nama;
   final double ukuran;
   final Widget fallback;
+
+  /// True = [AssetRegistry.logoIkon], bukan `ui/ui_<nama>.png`.
+  final bool logo;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -109,7 +117,7 @@ class IkonUi extends ConsumerWidget {
     return ListenableBuilder(
       listenable: reg,
       builder: (context, _) {
-        final img = reg.gambarUi(nama);
+        final img = logo ? reg.logoIkon() : reg.gambarUi(nama);
         if (img == null) return fallback;
         return GambarPixel(img, lebar: ukuran, tinggi: ukuran);
       },

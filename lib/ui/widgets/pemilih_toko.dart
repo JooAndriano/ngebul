@@ -90,11 +90,9 @@ class _PemilihTokoState extends ConsumerState<PemilihToko> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IkonUi(
-                    'icon_toko',
-                    ukuran: 20,
-                    fallback: Text(t.katalog.emoji),
-                  ),
+                  // Logo ikon Ngebul di samping nama toko (cadangan: emoji
+                  // jenis usaha).
+                  IkonUi.logo(ukuran: 24, fallback: Text(t.katalog.emoji)),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(

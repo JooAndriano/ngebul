@@ -97,6 +97,21 @@ void main() {
         reason: nama,
       );
     }
+    // Logo ikon Ngebul di samping nama toko (tombol pemilih toko HUD).
+    final pemilih = find.byKey(const ValueKey('tombol-pemilih-toko'));
+    final logo = find.descendant(
+      of: pemilih,
+      matching: find.byWidgetPredicate((w) => w is IkonUi && w.logo),
+    );
+    expect(logo, findsOneWidget);
+    expect(
+      find.descendant(of: logo, matching: find.byType(GambarPixel)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: pemilih, matching: find.text('Warung Uji')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -133,14 +133,14 @@ paket, ...) tetap emoji.
 | Kunci | Hasil | Pemakaian |
 |---|---|---|
 | ui_coin, ui_star | 48x48, 48x44 | HUD uang & reputasi |
-| ui_icon_stok_habis / ormas_alert / sms / toko | <= 48 | badge Kelola, pemilih toko, ikon tepi, bubble stok habis |
+| ui_icon_stok_habis / ormas_alert / sms / toko | <= 48 | badge Kelola, daftar toko (ormas), ikon tepi, bubble stok habis |
 | ui_bubble_order / ui_bubble_bayar | 95x75 / 71x67 | bubble pesanan (gambar utuh) |
 | ui_bubble_kosong | 118x63 | 9-slice: bubble kasir/stok habis & ucapan komik |
 | ui_tombol_hijau / merah / kuning | 164x102 | 9-slice: FilledButton (tema), Tebus segel, Tawar |
 | ui_panel_kayu | 174x174 | 9-slice: papan "DISEGEL" |
 | ui_snackbar | 280x48 | 9-slice: latar toast |
 | logo_ngebul | 258x154 | layar pilih usaha |
-| logo_ngebul_ikon | 63x64 | lencana bulat; terdaftar (`AssetRegistry.logoIkon`), belum dipakai di layar |
+| logo_ngebul_ikon | 63x64 | HUD: di samping nama toko (tombol pemilih toko), `IkonUi.logo` |
 
 Batas 9-slice di `SliceUi` (`path_aset.dart`). Teks selalu ditulis Flutter.
 
