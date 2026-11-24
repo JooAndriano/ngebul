@@ -254,11 +254,13 @@ void main() {
       // _wait belum ada -> menunggu memakai idle.
       expect(a.untuk(StateKarakter.menunggu), same(a.idle));
 
-      // customer_05 belum ada -> cadangan tipe 6 (berikutnya yang ada).
-      final c5 = r.animasiPelanggan(5);
-      expect(c5.adaGambar, isTrue);
-      expect(c5.varian, 5);
-      expect(c5.varianGambar, 6);
+      // Keenam tipe punya gambar sendiri, ukuran frame sama.
+      for (var v = 1; v <= AssetRegistry.jumlahVarianPelanggan; v++) {
+        final p = r.animasiPelanggan(v);
+        expect(p.varianGambar, v, reason: 'tipe $v');
+        expect(p.walk!.ukuranFrame, a.walk!.ukuranFrame, reason: 'tipe $v');
+        expect(p.idle!.ukuranFrame, a.walk!.ukuranFrame, reason: 'tipe $v');
+      }
 
       expect(r.pakRT(StatePakRT.walk)!.frames, hasLength(4));
       expect(
@@ -287,12 +289,27 @@ void main() {
       }
       expect(r.gambarUi('coin'), isNotNull);
       expect(r.logo(), isNotNull);
+      expect(r.logoIkon(), isNotNull);
       // Yang hilang hanya yang sengaja diminta di atas.
-      expect(r.asetHilang, {
-        PathAset.barang('bakso'),
-        PathAset.pelanggan(5, StateKarakter.idle),
-        PathAset.pelanggan(5, StateKarakter.walk),
-      });
+      expect(r.asetHilang, {PathAset.barang('bakso')});
+      r.bersihkan();
+    });
+
+    testWidgets('tipe tanpa gambar memakai tipe berikutnya yang ada', (
+      tester,
+    ) async {
+      // Manifest sungguhan tanpa customer_05.
+      final r = AssetRegistry(
+        daftarAset: () async => [
+          for (final p in KatalogAset.semua.values)
+            if (!p.contains('customer_05')) '$prefixGambar$p',
+        ],
+      );
+      await tester.runAsync(r.muat);
+      final c5 = r.animasiPelanggan(5);
+      expect(c5.adaGambar, isTrue);
+      expect(c5.varian, 5);
+      expect(c5.varianGambar, 6);
       r.bersihkan();
     });
   });

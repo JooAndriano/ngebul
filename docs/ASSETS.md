@@ -35,7 +35,8 @@ store_assets/...             ikon aplikasi, splash, grafis Play Store
 | Garis tanah | Karakter: struktur horizontal tipis (tebal <= 24 px sumber, panjang >= 16) di zona kaki dihapus. Kaki yang menapak tetap utuh. |
 | Bintik | Komponen terhubung < 300 px sumber (600 untuk UI) dihapus. |
 | Frame | Sheet karakter dipotong per figur (deteksi kolom kosong), lalu disusun ulang ke frame berukuran SAMA dengan jangkar bawah-tengah. Figur yang melewati batas grid sumber (customer_03, pakrt) ikut beres. |
-| Perkecil | NEAREST NEIGHBOR, sampel di tengah blok sumber. |
+| Perkecil | NEAREST NEIGHBOR, sampel di tengah blok sumber. Faktor karakter dinormalkan ke resolusi acuan 1408x768 (file 2816x1536 memakai faktor 2x). |
+| Tinggi maks | Sheet pelanggan yang figurnya > 71 px (toleransi 2%) diperkecil ke 71 px: frame tetap 46x72 dan idle/walk yang digambar beda ukuran disamakan (customer_05). |
 | Trim | HANYA barang & ikon UI tunggal (bukan sheet/karakter). |
 | Snackbar | Garis sisa grid di kertas dibersihkan (isi disalin dari satu kolom bersih). |
 
@@ -45,7 +46,8 @@ Faktor/ukuran target ada di konstanta atas skrip (`fKarakter`, `fTroll`,
 ## 2. Aset terpasang
 
 Kolom "Asli" = ukuran file di `assets_src/` (semua JPEG berekstensi .png,
-kecuali customer_03_idle PNG tanpa alpha). Jangkar = titik yang ditempel ke
+kecuali customer_03_idle PNG tanpa alpha; customer_05 & logo_ngebul_ikon
+2816x1536). Jangkar = titik yang ditempel ke
 posisi di scene.
 
 ### Latar (`backgrounds/`)
@@ -83,7 +85,7 @@ hari < 0,5 <= sore < 0,8 <= malam, crossfade selebar 0,06 di tiap batas.
 
 | Kunci | Hasil | Frame | Jangkar |
 |---|---|---|---|
-| customer_0N_walk (N = 1,2,3,4,6) | 184x72 | 4 x (46x72), menghadap KANAN | bawah-tengah (kaki baris terbawah, x = pusat kepala/badan) |
+| customer_0N_walk (N = 1..6) | 184x72 | 4 x (46x72), menghadap KANAN | bawah-tengah (kaki baris terbawah, x = pusat kepala/badan) |
 | customer_0N_idle | 46x72 | 1 | sama |
 | pakrt_walk | 240x72 | 4 x (60x72), menghadap KIRI | sama |
 | pakrt_idle, pakrt_gaksanggup | 60x72 | 1 | sama |
@@ -93,11 +95,11 @@ hari < 0,5 <= sore < 0,8 <= malam, crossfade selebar 0,06 di tiap batas.
 - Satu keluarga (semua pelanggan / Pak RT / kasir) berbagi ukuran frame,
   jadi tinggi relatif antar tokoh terjaga (anak SD lebih pendek).
 - Skala 1/8 dari sumber. Di layar: tinggi frame -> `ukuranPelanggan`
-  (15% tinggi scene), skala fisik bulat.
+  (22% tinggi scene, dikecilkan di layar pendek), skala fisik bulat terdekat.
 - Jalan: 0,13 dtk/frame (`UkuranAset.langkahJalan`). Kasir kerja 0,4 dtk.
 - Tipe pelanggan 1..6 dari hash id (deterministik, kedatangan beruntun
-  jarang sama). Tipe tanpa gambar (customer_05) memakai tipe berikutnya
-  yang ada. `_wait` opsional (cadangan: idle).
+  jarang sama). Tipe yang gambarnya hilang memakai tipe berikutnya yang
+  ada. `_wait` opsional (cadangan: idle).
 - Sprite dicerminkan saat berjalan/menghadap ke kiri; Pak RT sebaliknya
   (walk asli menghadap kiri, dicerminkan saat keluar ke kanan).
 
@@ -138,6 +140,7 @@ paket, ...) tetap emoji.
 | ui_panel_kayu | 174x174 | 9-slice: papan "DISEGEL" |
 | ui_snackbar | 280x48 | 9-slice: latar toast |
 | logo_ngebul | 258x154 | layar pilih usaha |
+| logo_ngebul_ikon | 63x64 | lencana bulat; terdaftar (`AssetRegistry.logoIkon`), belum dipakai di layar |
 
 Batas 9-slice di `SliceUi` (`path_aset.dart`). Teks selalu ditulis Flutter.
 
@@ -152,7 +155,7 @@ play_feature_graphic (asli 1584x672) + `_1024x500` (ukuran resmi Play).
 
 ### Belum ada (fallback aktif)
 
-customer_05_walk/_idle (pakai tipe lain), logo_ngebul_ikon.
+Tidak ada; semua aset di daftar sudah terpasang.
 
 ## 3. Rendering pixel-art
 

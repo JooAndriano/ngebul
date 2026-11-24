@@ -46,6 +46,12 @@ const int fLogo = 4;
 const int sisiBarang = 48;
 const int sisiIkonUi = 48;
 
+/// Sisi terpanjang logo_ngebul_ikon (lencana bulat).
+const int sisiLogoIkon = 64;
+
+/// Tinggi figur pelanggan maksimum (px hasil); frame pelanggan = 46x72.
+const double tinggiMaksPelanggan = 71;
+
 // --------------------------------------------------------------- daftar aset
 
 const latar = ['bg_hari', 'bg_sore', 'bg_malam', 'bg_hujan'];
@@ -325,11 +331,30 @@ Rgba trimPerkecil(Rgba g, {double? f, int? sisi}) {
 
 // ---------------------------------------------------------------- karakter
 
+/// Tinggi sumber acuan (generate standar 1408x768). File beresolusi lain
+/// (mis. 2816x1536) dinormalkan ke acuan ini.
+const int tinggiAcuan = 768;
+
+/// Kelipatan resolusi sumber terhadap acuan, dibulatkan ke 0,5 terdekat.
+double skalaSumber(Rgba g) => (g.h / tinggiAcuan * 2).round() / 2;
+
 /// Satu figur dalam sheet sumber.
 class Figur {
-  Figur(this.g, this.x0, this.x1, this.atas, this.dasar, this.ax);
+  Figur(
+    this.g,
+    this.x0,
+    this.x1,
+    this.atas,
+    this.dasar,
+    this.ax, {
+    this.skala = 1,
+  });
 
   final Rgba g;
+
+  /// Resolusi sumber relatif ke acuan ([tinggiAcuan]); faktor perkecil
+  /// dikalikan ini supaya file beresolusi 2x tetap seukuran tokoh lain.
+  double skala;
   final int x0, x1; // kolom sumber
   final int atas; // baris teratas figur
   final int dasar; // baris kaki (sama untuk satu sheet)
@@ -377,12 +402,21 @@ List<Figur>? figurSheet(
 }) {
   final g = baca(nama);
   if (g == null) return null;
+  final k = skalaSumber(g);
+  if (k != 1) {
+    peringatan.add('$nama: resolusi ${k}x acuan, faktor perkecil ikut x$k');
+  }
   kunciMagenta(g);
   if (garisTanah) {
-    final px = hapusGarisTanah(g);
+    final px = hapusGarisTanah(
+      g,
+      tebalMaks: (24 * k).round(),
+      panjangMin: (16 * k).round(),
+      zona: (48 * k).round(),
+    );
     if (px > 0) peringatan.add('$nama: garis tanah dihapus ($px px)');
   }
-  final bintik = hapusBintik(g, luasMin: 300);
+  final bintik = hapusBintik(g, luasMin: (300 * k * k).round());
   if (bintik > 2000) peringatan.add('$nama: $bintik px bintik dihapus');
 
   var seg = segmen(g);
@@ -414,6 +448,7 @@ List<Figur>? figurSheet(
         kotakFig[i].y0,
         dasar,
         _jangkarX(g, kotakFig[i]),
+        skala: k,
       ),
   ];
 }
@@ -440,13 +475,35 @@ void susunKeluarga(
   Map<String, List<Figur>> sheet, {
   required int f,
   required String folder,
+  double? tinggiMaks,
 }) {
+  // Sheet yang figurnya lebih tinggi dari [tinggiMaks] (toleransi 2%)
+  // diperkecil ke [tinggiMaks]: menjaga ukuran frame keluarga dan
+  // menyamakan idle/walk yang digambar beda ukuran oleh generator.
+  if (tinggiMaks != null) {
+    for (final e in sheet.entries) {
+      final fs = e.value;
+      final t = fs
+          .map((fg) => (fg.dasar + 1 - fg.atas) / (f * fg.skala))
+          .reduce(math.max);
+      if (t > tinggiMaks * 1.02) {
+        for (final fg in fs) {
+          fg.skala *= t / tinggiMaks;
+        }
+        peringatan.add(
+          '${e.key}: figur ${t.toStringAsFixed(1)} px > $tinggiMaks, '
+          'diperkecil ke $tinggiMaks',
+        );
+      }
+    }
+  }
   var kiri = 0.0, kanan = 0.0, tinggi = 0.0;
   for (final fs in sheet.values) {
     for (final fg in fs) {
-      kiri = math.max(kiri, (fg.ax - fg.x0) / f);
-      kanan = math.max(kanan, (fg.x1 + 1 - fg.ax) / f);
-      tinggi = math.max(tinggi, (fg.dasar + 1 - fg.atas) / f);
+      final ff = f * fg.skala;
+      kiri = math.max(kiri, (fg.ax - fg.x0) / ff);
+      kanan = math.max(kanan, (fg.x1 + 1 - fg.ax) / ff);
+      tinggi = math.max(tinggi, (fg.dasar + 1 - fg.atas) / ff);
     }
   }
   final w = (math.max(kiri, kanan).ceil() + 1) * 2;
@@ -458,9 +515,9 @@ void susunKeluarga(
       final fg = fs[i];
       final fr = sampel(
         fg.g,
-        ox: fg.ax - (w / 2) * f,
-        oy: fg.dasar + 1 - h * f.toDouble(),
-        f: f.toDouble(),
+        ox: fg.ax - (w / 2) * f * fg.skala,
+        oy: fg.dasar + 1 - h * f * fg.skala,
+        f: f * fg.skala,
         w: w,
         h: h,
         klipX0: fg.x0,
@@ -525,7 +582,13 @@ void prosesPelanggan() {
     if (walk != null) sheet['customer_${v}_walk'] = walk;
     if (idle != null) sheet['customer_${v}_idle'] = idle;
   }
-  susunKeluarga(sheet, f: fKarakter, folder: 'characters');
+  // Batas = figur dewasa tertinggi set awal (customer_06, ~71 px).
+  susunKeluarga(
+    sheet,
+    f: fKarakter,
+    folder: 'characters',
+    tinggiMaks: tinggiMaksPelanggan,
+  );
 }
 
 void prosesPakRT() {
@@ -636,7 +699,10 @@ void prosesUi() {
     kunciMagenta(g);
     hapusBintik(g, luasMin: 300);
     tulis(
-      trimPerkecil(g, f: fLogo.toDouble()),
+      // Logo ikon (lencana bulat) dipakai kecil: sisi terpanjang tetap.
+      n == 'logo_ngebul_ikon'
+          ? trimPerkecil(g, sisi: sisiLogoIkon)
+          : trimPerkecil(g, f: fLogo.toDouble()),
       '$dirHasil/ui/$n.png',
       nama: n,
       asal: asal,
@@ -686,12 +752,7 @@ void prosesToko() {
     kunciMagenta(logo);
     hapusBintik(logo, luasMin: 300);
     final kecil = trimPerkecil(logo, f: 2);
-    tulis(
-      kecil,
-      '$dirToko/splash_logo.png',
-      nama: 'splash_logo',
-      asal: asal,
-    );
+    tulis(kecil, '$dirToko/splash_logo.png', nama: 'splash_logo', asal: asal);
     // Branding splash Android 12+ (bawah layar): kanvas 800x320 (= 200x80
     // dp di xxxhdpi, batas maksimum branding), logo di tengah.
     const bw = 800, bh = 320;

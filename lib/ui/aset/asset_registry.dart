@@ -314,6 +314,9 @@ class AssetRegistry extends ChangeNotifier {
   /// Logo judul. Null = teks.
   ui.Image? logo() => _ambil(PathAset.logo);
 
+  /// Logo ikon (lencana bulat kecil). Null = fallback pemanggil.
+  ui.Image? logoIkon() => _ambil(PathAset.logoIkon);
+
   // ------------------------------------------------------------ internal
 
   ui.Image? _ambil(String path, {bool wajib = true}) {

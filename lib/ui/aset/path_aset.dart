@@ -157,14 +157,17 @@ abstract final class PathAset {
 
   /// `ui/logo_ngebul.png`
   static const String logo = 'ui/logo_ngebul.png';
+
+  /// `ui/logo_ngebul_ikon.png` (lencana bulat kecil).
+  static const String logoIkon = 'ui/logo_ngebul_ikon.png';
 }
 
 /// Semua aset yang terdaftar: kunci konsisten -> path. Dipakai tes manifest
 /// (tiap path harus ada di bundle) dan dokumentasi. Aset opsional
-/// (customer_05, `_wait`, logo ikon) TIDAK di sini: boleh belum ada.
+/// (`_wait`) TIDAK di sini: boleh belum ada.
 abstract final class KatalogAset {
   /// Tipe pelanggan yang sudah punya gambar.
-  static const List<int> varianPelangganAda = [1, 2, 3, 4, 6];
+  static const List<int> varianPelangganAda = [1, 2, 3, 4, 5, 6];
 
   /// Barang yang punya gambar (nama file, bukan id katalog).
   static const List<String> barang = [
@@ -205,5 +208,6 @@ abstract final class KatalogAset {
     for (final b in barang) 'item_$b': PathAset.barang(b),
     for (final u in ui) 'ui_$u': PathAset.ui(u),
     'logo_ngebul': PathAset.logo,
+    'logo_ngebul_ikon': PathAset.logoIkon,
   };
 }
