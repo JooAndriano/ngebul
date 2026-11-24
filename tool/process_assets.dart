@@ -685,10 +685,30 @@ void prosesToko() {
     final asal = ukuranAsli(logo, 'logo_ngebul');
     kunciMagenta(logo);
     hapusBintik(logo, luasMin: 300);
+    final kecil = trimPerkecil(logo, f: 2);
     tulis(
-      trimPerkecil(logo, f: 2),
+      kecil,
       '$dirToko/splash_logo.png',
       nama: 'splash_logo',
+      asal: asal,
+    );
+    // Branding splash Android 12+ (bawah layar): kanvas 800x320 (= 200x80
+    // dp di xxxhdpi, batas maksimum branding), logo di tengah.
+    const bw = 800, bh = 320;
+    final branding = Rgba(bw, bh);
+    final dx = (bw - kecil.w) ~/ 2, dy = (bh - kecil.h) ~/ 2;
+    for (var y = 0; y < kecil.h; y++) {
+      branding.d.setRange(
+        ((y + dy) * bw + dx) * 4,
+        ((y + dy) * bw + dx + kecil.w) * 4,
+        kecil.d,
+        y * kecil.w * 4,
+      );
+    }
+    tulis(
+      branding,
+      '$dirToko/splash_branding.png',
+      nama: 'splash_branding',
       asal: asal,
     );
   }

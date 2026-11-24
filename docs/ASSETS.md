@@ -145,7 +145,9 @@ Batas 9-slice di `SliceUi` (`path_aset.dart`). Teks selalu ditulis Flutter.
 
 ic_launcher (1024, legacy/iOS), ic_launcher_foreground (1024, transparan,
 figur <= 430 px di tengah = zona aman adaptive), ic_launcher_background
-(1024), splash_logo (516x307, dianggap 4x), splash_android12 (960),
+(1024), splash_logo (516x307, dianggap 4x; splash Android <= 11 & iOS),
+splash_android12 (960, ikon tengah Android 12+), splash_branding (800x320 =
+200x80 dp, logo di bawah splash Android 12+),
 play_feature_graphic (asli 1584x672) + `_1024x500` (ukuran resmi Play).
 
 ### Belum ada (fallback aktif)
